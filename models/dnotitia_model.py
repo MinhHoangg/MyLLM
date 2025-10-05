@@ -1,12 +1,25 @@
 """
-DNotitia Model Wrapper: Interface for language models with automatic fallback.
-Supports multiple models optimized for Mac's memory constraints.
+DNotitia Model Wrapper: Backward-compatible interface using the new model manager.
+
+This file maintains compatibility with existing code while using the new
+separated model architecture for better debugging and maintenance.
+
+NEW ARCHITECTURE:
+- dnotitia_primary_model.py: Handles DNotitia DNA-2.0-8B (primary)
+- exaone_fallback_model.py: Handles EXAONE-3.5-7.8B (fallback)  
+- model_manager.py: Unified manager with automatic fallback
+- dnotitia_model.py: Backward-compatible wrapper (this file)
+
+Benefits:
+- Easier debugging of specific model issues
+- Clear separation of concerns
+- Individual model optimization
+- Better error handling and logging
 """
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
 from typing import List, Optional, Dict, Any
 import logging
+from .model_manager import ModelManager
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -14,13 +27,13 @@ logger = logging.getLogger(__name__)
 
 class DNotitiaModel:
     """
-    Wrapper for language models with automatic fallback support.
+    Backward-compatible wrapper around the new ModelManager.
     
-    Primary: dnotitia/DNA-2.0-8B (8B parameters, requires approval)
-    Fallback: LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct (7.8B parameters, open access)
+    This maintains the same interface as before while using the improved
+    separated model architecture underneath.
     """
     
-    # Model configurations in priority order
+    # Keep the same MODEL_CONFIGS for compatibility
     MODEL_CONFIGS = [
         {
             "name": "dnotitia/DNA-2.0-8B",
@@ -38,7 +51,7 @@ class DNotitiaModel:
     
     def __init__(
         self,
-        model_name: str = "dnotitia/DNA-2.0-1.7B",
+        model_name: str = "dnotitia/DNA-2.0-8B",
         device: Optional[str] = None,
         max_length: int = 2048,
         temperature: float = 0.7,
@@ -49,163 +62,61 @@ class DNotitiaModel:
         """
         Initialize the model with automatic fallback support.
         
-        Args:
-            model_name: Hugging Face model identifier (primary model to try)
-            device: Device to run model on ('cuda', 'mps', 'cpu', or None for auto)
-            max_length: Maximum sequence length
-            temperature: Sampling temperature
-            top_p: Nucleus sampling parameter
-            hf_token: Hugging Face authentication token (for gated models)
-            use_fallback: If True, automatically fallback to EXAONE if primary fails
+        This now uses the new ModelManager internally but maintains
+        the same external interface for backward compatibility.
         """
+        logger.info("🔄 Using new separated model architecture")
+        logger.info(f"   Primary: dnotitia_primary_model.py")
+        logger.info(f"   Fallback: exaone_fallback_model.py")
+        logger.info(f"   Manager: model_manager.py")
+        
+        # Store parameters for compatibility
         self.requested_model = model_name
-        self.model_name = None  # Will be set after successful load
         self.max_length = max_length
         self.temperature = temperature
         self.top_p = top_p
         self.hf_token = hf_token
         self.use_fallback = use_fallback
         
-        # Determine device with MPS support for Mac
-        if device is None:
-            if torch.cuda.is_available():
-                self.device = "cuda"
-            elif torch.backends.mps.is_available():
-                self.device = "mps"
-            else:
-                self.device = "cpu"
-        else:
-            self.device = device
+        # Determine preference: prefer primary if requesting DNotitia model
+        prefer_primary = (model_name == "dnotitia/DNA-2.0-8B")
         
-        logger.info(f"Target device: {self.device}")
-        
-        # Try to load model with fallback
-        self.tokenizer = None
-        self.model = None
-        self._load_model_with_fallback()
-    
-    def _load_model_with_fallback(self):
-        """Try loading primary model, fallback to other models if it fails."""
-        # Determine which models to try
-        models_to_try = []
-        
-        # Add requested model first
-        models_to_try.append(self.requested_model)
-        
-        # Add fallback models if enabled
-        if self.use_fallback:
-            for config in self.MODEL_CONFIGS:
-                if config["name"] != self.requested_model:
-                    models_to_try.append(config["name"])
-        
-        # Try each model in order
-        last_error = None
-        for model_name in models_to_try:
-            try:
-                logger.info(f"Attempting to load: {model_name}")
-                self._load_model(model_name)
-                self.model_name = model_name
-                logger.info(f"✅ Successfully loaded: {model_name}")
-                return
-            except Exception as e:
-                last_error = e
-                error_str = str(e)
-                logger.warning(f"❌ Failed to load {model_name}: {error_str}")
-                
-                # Check if it's an authentication error
-                if "401" in error_str or "403" in error_str or "gated" in error_str.lower():
-                    logger.info(f"⚠️ {model_name} requires approval or authentication")
-                    if self.use_fallback:
-                        logger.info("→ Trying fallback model...")
-                        continue
-                # Check if it's a memory error
-                elif "out of memory" in error_str.lower() or "oom" in error_str.lower():
-                    logger.warning(f"⚠️ {model_name} requires too much memory for {self.device}")
-                    
-                    # Try CPU if we were using MPS/CUDA
-                    if self.device in ["mps", "cuda"]:
-                        logger.info("→ Attempting to load on CPU instead...")
-                        original_device = self.device
-                        self.device = "cpu"
-                        try:
-                            self._load_model(model_name)
-                            self.model_name = model_name
-                            logger.info(f"✅ Successfully loaded {model_name} on CPU")
-                            logger.warning(f"Note: Running on CPU will be slower than {original_device}")
-                            return
-                        except Exception as cpu_error:
-                            logger.warning(f"❌ CPU loading also failed: {str(cpu_error)}")
-                            self.device = original_device  # Restore original device
-                    
-                    if self.use_fallback:
-                        logger.info("→ Trying next fallback model...")
-                        continue
-                else:
-                    logger.error(f"→ Error: {error_str}")
-                    if self.use_fallback:
-                        continue
-        
-        # If we got here, all models failed
-        error_msg = f"Failed to load any model. Last error: {str(last_error)}"
-        if "401" in str(last_error) or "403" in str(last_error):
-            error_msg += "\n\n💡 The primary model requires Hugging Face authentication."
-            error_msg += "\nPlease provide a valid HF token or wait for model approval."
-        elif "out of memory" in str(last_error).lower():
-            error_msg += "\n\n💡 All models require too much memory."
-            error_msg += "\n\nSolutions:"
-            error_msg += "\n1. Close other applications to free up memory"
-            error_msg += "\n2. Use a smaller model by editing MODEL_CONFIGS"
-            error_msg += "\n3. Run with device='cpu' (slower but uses less memory)"
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
-    
-    def _load_model(self, model_name: str):
-        """
-        Load a specific model.
-        
-        Args:
-            model_name: Model identifier to load
+        try:
+            # Initialize the model manager
+            self.manager = ModelManager(
+                prefer_primary=prefer_primary,
+                hf_token=hf_token,
+                device=device,
+                max_length=max_length,
+                temperature=temperature,
+                top_p=top_p
+            )
             
-        Raises:
-            Exception if loading fails
-        """
-        logger.info(f"Loading model: {model_name} on {self.device}...")
-        
-        # Prepare authentication kwargs
-        auth_kwargs = {}
-        if self.hf_token:
-            auth_kwargs["token"] = self.hf_token
-            logger.info("Using provided HF token for authentication")
-        
-        # Load tokenizer
-        logger.info("Loading tokenizer...")
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=True,
-            **auth_kwargs
-        )
-        
-        # Set padding token if not set
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-        
-        # Load model with appropriate dtype
-        logger.info("Loading model weights...")
-        dtype = torch.float16 if self.device in ["cuda", "mps"] else torch.float32
-        
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            trust_remote_code=True,
-            torch_dtype=dtype,
-            low_cpu_mem_usage=True,
-            **auth_kwargs
-        )
-        
-        # Move to device
-        self.model.to(self.device)
-        self.model.eval()
-        
-        logger.info(f"✅ Model loaded successfully on {self.device}")
+            # Set compatibility attributes
+            model_info = self.manager.get_model_info()
+            
+            # CRITICAL: Ensure model_name is ALWAYS a string (fix for split error)
+            raw_model_name = model_info.get('model_name', 'Unknown')
+            if not isinstance(raw_model_name, str):
+                logger.error(f"⚠️ BUG FOUND: model_name is {type(raw_model_name)}, not str!")
+                logger.error(f"   Value: {repr(raw_model_name)}")
+                self.model_name = str(raw_model_name) if raw_model_name else "Unknown"
+            else:
+                self.model_name = raw_model_name
+            
+            self.device = model_info.get('device', 'cpu')
+            
+            logger.info(f"✅ Model wrapper initialized")
+            logger.info(f"   Active model: {self.model_name} (type: {type(self.model_name).__name__})")
+            logger.info(f"   Device: {self.device}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize model manager: {e}")
+            # For compatibility, still set these attributes
+            self.manager = None
+            self.model_name = None
+            self.device = device or "cpu"
+            raise
     
     def generate(
         self,
@@ -219,51 +130,18 @@ class DNotitiaModel:
         """
         Generate text from a prompt.
         
-        Args:
-            prompt: Input text prompt
-            max_new_tokens: Maximum number of new tokens to generate
-            temperature: Sampling temperature (uses default if None)
-            top_p: Nucleus sampling parameter (uses default if None)
-            do_sample: Whether to use sampling
-            num_return_sequences: Number of sequences to generate
-            
-        Returns:
-            Generated text
+        This delegates to the ModelManager while maintaining the same interface.
         """
-        # Use default parameters if not specified
-        temp = temperature if temperature is not None else self.temperature
-        top_p_val = top_p if top_p is not None else self.top_p
+        if self.manager is None:
+            raise RuntimeError("Model manager not initialized")
         
-        # Tokenize input
-        inputs = self.tokenizer(
-            prompt,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=self.max_length
-        ).to(self.device)
-        
-        # Generate
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=max_new_tokens,
-                temperature=temp,
-                top_p=top_p_val,
-                do_sample=do_sample,
-                num_return_sequences=num_return_sequences,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id
-            )
-        
-        # Decode output
-        generated_text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        
-        # Remove the prompt from the output
-        if generated_text.startswith(prompt):
-            generated_text = generated_text[len(prompt):].strip()
-        
-        return generated_text
+        return self.manager.generate(
+            prompt=prompt,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_p=top_p
+            # Note: do_sample and num_return_sequences are handled internally
+        )
     
     def generate_batch(
         self,
@@ -274,19 +152,13 @@ class DNotitiaModel:
     ) -> List[str]:
         """
         Generate text for multiple prompts in batch.
-        
-        Args:
-            prompts: List of input text prompts
-            max_new_tokens: Maximum number of new tokens to generate
-            temperature: Sampling temperature
-            top_p: Nucleus sampling parameter
-            
-        Returns:
-            List of generated texts
         """
+        if self.manager is None:
+            raise RuntimeError("Model manager not initialized")
+        
         results = []
         for prompt in prompts:
-            result = self.generate(
+            result = self.manager.generate(
                 prompt=prompt,
                 max_new_tokens=max_new_tokens,
                 temperature=temperature,
@@ -299,57 +171,97 @@ class DNotitiaModel:
     def __call__(self, prompt: str, **kwargs) -> str:
         """
         Callable interface for the model.
-        
-        Args:
-            prompt: Input text prompt
-            **kwargs: Additional arguments for generate()
-            
-        Returns:
-            Generated text
         """
         return self.generate(prompt, **kwargs)
+    
+    def __str__(self) -> str:
+        """String representation to prevent accidental usage in string operations."""
+        return f"DNotitiaModel({self.model_name})"
+    
+    def __repr__(self) -> str:
+        """Detailed representation for debugging."""
+        return f"DNotitiaModel(model_name={self.model_name!r}, device={self.device!r})"
     
     def get_model_info(self) -> Dict[str, Any]:
         """
         Get information about the model.
         
-        Returns:
-            Dictionary with model information
+        This returns the same format as before for compatibility.
         """
-        # Find config for current model
+        if self.manager is None:
+            return {
+                'model_name': "Unknown",
+                'requested_model': self.requested_model,
+                'device': self.device,
+                'max_length': self.max_length,
+                'temperature': self.temperature,
+                'top_p': self.top_p,
+                'vocab_size': None,
+                'status': 'failed'
+            }
+        
+        # Get info from manager and adapt to old format
+        info = self.manager.get_model_info()
+        
+        # Find config for current model (for backward compatibility)
         model_config = next(
-            (cfg for cfg in self.MODEL_CONFIGS if cfg["name"] == self.model_name),
+            (cfg for cfg in self.MODEL_CONFIGS if cfg["name"] == info['model_name']),
             None
         )
         
-        # Ensure model_name is always a string
-        model_name_str = str(self.model_name) if self.model_name is not None else "Unknown"
-        
-        info = {
-            'model_name': model_name_str,
+        # Return in the expected format
+        result = {
+            'model_name': info['model_name'],
             'requested_model': self.requested_model,
-            'device': self.device,
-            'max_length': self.max_length,
-            'temperature': self.temperature,
-            'top_p': self.top_p,
-            'vocab_size': self.tokenizer.vocab_size if hasattr(self.tokenizer, 'vocab_size') else None
+            'device': info['device'],
+            'max_length': info['max_length'],
+            'temperature': info['temperature'],
+            'top_p': info['top_p'],
+            'vocab_size': info.get('vocab_size')
         }
         
-        # Add model-specific info if available
+        # Add model config info if available
         if model_config:
-            info['description'] = model_config['description']
-            info['requires_approval'] = model_config['requires_approval']
-            info['size_gb'] = model_config['size_gb']
-            info['is_fallback'] = self.model_name != self.requested_model
+            result['description'] = model_config['description']
+            result['requires_approval'] = model_config['requires_approval']
+            result['size_gb'] = model_config['size_gb']
+            result['is_fallback'] = info.get('is_fallback', False)
         
-        return info
+        return result
     
     @classmethod
     def list_available_models(cls) -> List[Dict[str, Any]]:
         """
         Get list of available model configurations.
-        
-        Returns:
-            List of model configuration dictionaries
         """
         return cls.MODEL_CONFIGS.copy()
+    
+    # New debugging methods (not in original interface)
+    def get_manager_info(self) -> Dict[str, Any]:
+        """
+        Get detailed information about the model manager (for debugging).
+        """
+        if self.manager is None:
+            return {'status': 'not_initialized'}
+        
+        return {
+            'manager_status': 'initialized',
+            'available_models': self.manager.get_available_models(),
+            'active_model_info': self.manager.get_model_info(),
+            'system_requirements': ModelManager.check_system_requirements()
+        }
+    
+    def switch_model(self, use_primary: bool = True) -> bool:
+        """
+        Switch between primary and fallback models (for debugging).
+        """
+        if self.manager is None:
+            return False
+        
+        success = self.manager.switch_model(use_primary)
+        if success:
+            # Update compatibility attributes
+            model_info = self.manager.get_model_info()
+            self.model_name = model_info['model_name']
+        
+        return success

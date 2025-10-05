@@ -72,16 +72,32 @@ def load_vector_db():
 def load_model():
     """Load and cache the language model."""
     try:
-        with st.spinner("Loading DNotitia model... This may take a few minutes..."):
-            model = DNotitiaModel(
-                model_name="dnotitia/DNA-2.0-8B",  # Primary model, will fallback to EXAONE if needed
-                max_length=2048,
-                temperature=0.7
-            )
+        st.info("🔄 Loading model... This may take 1-2 minutes...")
+        import logging
+        logging.info("="*60)
+        logging.info("STREAMLIT: Starting model load")
+        logging.info("="*60)
+        
+        model = DNotitiaModel(
+            model_name="dnotitia/DNA-2.0-8B",  # Primary model, will fallback to EXAONE if needed
+            max_length=2048,
+            temperature=0.7
+        )
+        
+        logging.info("="*60)
+        logging.info("STREAMLIT: Model loaded successfully")
+        logging.info(f"Model name: {model.model_name}")
+        logging.info(f"Model name type: {type(model.model_name)}")
+        logging.info("="*60)
+        
+        st.success(f"✅ Model loaded: {model.model_name}")
         return model
     except Exception as e:
-        st.error(f"Error loading model: {str(e)}")
-        st.info("The chatbot will work in retrieval-only mode without generation.")
+        st.error(f"❌ Error loading model: {str(e)}")
+        st.error(f"Error type: {type(e).__name__}")
+        import traceback
+        st.error(f"Traceback:\n```\n{traceback.format_exc()}\n```")
+        st.warning("⚠️ The chatbot will work in retrieval-only mode without generation.")
         return None
 
 
@@ -111,31 +127,52 @@ def initialize_app():
 
 def chat_page():
     """Render the main chat page."""
+    import logging
+    logging.info("📄 STREAMLIT: Rendering chat page")
+    
     st.title("🤖 Multimodal RAG Chatbot")
     st.markdown("Ask questions about your uploaded documents!")
     
     # Sidebar settings
     settings = sidebar_settings_component()
+    logging.info(f"⚙️ STREAMLIT: Settings loaded: {settings}")
     
     # Sidebar info
     with st.sidebar:
         st.divider()
         st.subheader("📊 System Info")
         if st.session_state.model:
-            model_info = st.session_state.model.get_model_info()
-            
-            # Show active model
-            model_name = model_info.get('model_name', 'Unknown')
-            if isinstance(model_name, str):
-                display_name = model_name.split('/')[-1] if '/' in model_name else model_name
-            else:
-                display_name = str(model_name)
-            st.text(f"Model: {display_name}")
-            st.text(f"Device: {model_info['device']}")
-            
-            # Show if using fallback
-            if model_info.get('is_fallback', False):
-                st.info(f"ℹ️ Using fallback model\n(Primary model pending approval)")
+            try:
+                model_info = st.session_state.model.get_model_info()
+                
+                # Show active model with robust error handling
+                model_name = model_info.get('model_name', 'Unknown')
+                
+                # Ensure model_name is a string
+                if not isinstance(model_name, str):
+                    st.error(f"⚠️ DEBUG: model_name is {type(model_name).__name__}, not string")
+                    st.error(f"Value: {repr(model_name)}")
+                    model_name = str(model_name) if model_name else 'Unknown'
+                
+                # Safely extract display name
+                try:
+                    display_name = model_name.split('/')[-1] if '/' in model_name else model_name
+                except AttributeError as e:
+                    st.error(f"❌ Split Error: {str(e)}")
+                    st.error(f"Type: {type(model_name)}, Value: {repr(model_name)}")
+                    display_name = 'Error'
+                
+                st.text(f"Model: {display_name}")
+                st.text(f"Device: {model_info.get('device', 'Unknown')}")
+                
+                # Show if using fallback
+                if model_info.get('is_fallback', False):
+                    st.info(f"ℹ️ Using fallback model\n(Primary model pending approval)")
+            except Exception as e:
+                st.error(f"❌ Error getting model info: {str(e)}")
+                st.error(f"Error type: {type(e).__name__}")
+                import traceback
+                st.error(f"Traceback:\n{traceback.format_exc()}")
         else:
             st.warning("Model not loaded")
         
@@ -156,6 +193,11 @@ def chat_page():
     
     # Chat input
     if prompt := st.chat_input("Ask a question about your documents..."):
+        import logging
+        logging.info("="*60)
+        logging.info(f"💬 STREAMLIT: User input: {prompt}")
+        logging.info("="*60)
+        
         # Add user message to chat
         st.session_state.messages.append({"role": "user", "content": prompt})
         
@@ -166,21 +208,74 @@ def chat_page():
         with st.chat_message("assistant"):
             with loading_spinner("Thinking..."):
                 if st.session_state.chatbot:
-                    response = st.session_state.chatbot.chat(
-                        question=prompt,
-                        use_rag=settings['use_rag'],
-                        n_results=settings['n_results'],
-                        include_history=settings['include_history']
-                    )
-                    
-                    answer = response.get('answer', 'No answer generated.')
-                    st.markdown(answer)
-                    
-                    # Show sources if available
-                    if response.get('sources'):
-                        with st.expander("📚 View Sources"):
-                            for idx, source in enumerate(response['sources'][:3], 1):
-                                st.text(f"{idx}. {source.get('file_name', 'Unknown')}")
+                    try:
+                        logging.info(f"🤖 STREAMLIT: Calling chatbot.chat()")
+                        logging.info(f"   use_rag={settings['use_rag']}, n_results={settings['n_results']}")
+                        
+                        response = st.session_state.chatbot.chat(
+                            question=prompt,
+                            use_rag=settings['use_rag'],
+                            n_results=settings['n_results'],
+                            include_history=settings['include_history']
+                        )
+                        
+                        # DETAILED RESPONSE LOGGING
+                        logging.info("="*60)
+                        logging.info("✅ STREAMLIT: Got response from chatbot.chat()")
+                        logging.info(f"Response keys: {list(response.keys())}")
+                        logging.info(f"Response types: {[(k, type(v).__name__) for k, v in response.items()]}")
+                        
+                        # Log each field
+                        for key, value in response.items():
+                            if key == 'answer':
+                                val_str = str(value)[:200] if len(str(value)) > 200 else str(value)
+                                logging.info(f"  answer: {val_str}")
+                            elif key == 'error':
+                                logging.error(f"  ❌ ERROR in response.error: {value}")
+                            else:
+                                logging.info(f"  {key}: {value}")
+                        logging.info("="*60)
+                        
+                        answer = response.get('answer', 'No answer generated.')
+                        
+                        # Check if error in response
+                        if 'error' in response:
+                            st.error(f"❌ Error: {response['error']}")
+                            import traceback
+                            if 'split' in str(response['error']).lower():
+                                st.error("🐛 DEBUG: This is the SPLIT error!")
+                                st.error(f"Full error: {response.get('error')}")
+                        
+                        st.markdown(answer)
+                        
+                        # Show sources if available
+                        if response.get('sources'):
+                            with st.expander("📚 View Sources"):
+                                for idx, source in enumerate(response['sources'][:3], 1):
+                                    st.text(f"{idx}. {source.get('file_name', 'Unknown')}")
+                    except Exception as e:
+                        import logging
+                        import traceback
+                        
+                        logging.error("="*60)
+                        logging.error(f"❌ STREAMLIT EXCEPTION: {type(e).__name__}")
+                        logging.error(f"Message: {str(e)}")
+                        logging.error("Traceback:")
+                        logging.error(traceback.format_exc())
+                        logging.error("="*60)
+                        
+                        answer = f"Error generating response: {str(e)}"
+                        st.error(f"❌ Chat Error: {str(e)}")
+                        st.error(f"Error type: {type(e).__name__}")
+                        
+                        # Special handling for split error
+                        if "'DNotitiaModel' object has no attribute 'split'" in str(e):
+                            st.error("🐛 **SPLIT ERROR DETECTED!**")
+                            st.error("This means somewhere the code is trying to call .split() on the model object instead of a string")
+                            st.error(f"Check terminal logs for full traceback")
+                        
+                        st.error(f"Traceback:\n```python\n{traceback.format_exc()}\n```")
+                        st.markdown(answer)
                 else:
                     answer = "Chatbot not initialized. Please check the configuration."
                     st.markdown(answer)
@@ -356,7 +451,7 @@ def main():
     st.sidebar.divider()
     st.sidebar.markdown("---")
     st.sidebar.caption("🤖 Multimodal RAG Chatbot v1.0")
-    st.sidebar.caption("Powered by DSPy & DNotitia DNA-2.0-1.7B")
+    st.sidebar.caption("Powered by DSPy & DNotitia DNA-2.0-8B")
 
 
 if __name__ == "__main__":

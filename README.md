@@ -354,6 +354,7 @@ cd "/Users/hoangquangminh/Library/CloudStorage/OneDrive-FPTCorporation/ChatBot"
 ```bash
 python -m venv venv
 source venv/bin/activate  # macOS/Linux
+source .venv/bin/activate && streamlit run ui/app.py  # macOS/Linux
 # or
 venv\Scripts\activate  # Windows
 ```

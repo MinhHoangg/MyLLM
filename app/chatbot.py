@@ -96,27 +96,54 @@ class MultimodalChatbot:
     
     def _create_dspy_lm(self):
         """Create a DSPy-compatible language model wrapper."""
+        # Store model reference at class level to avoid passing in __call__
+        actual_model = self.model
+        
         class DNotitiaLM(dspy.LM):
-            def __init__(self, model):
-                super().__init__(model="dnotitia")  # Call parent __init__
-                self.model = model
+            def __init__(self, model_name_str):
+                # Pass only the string name to DSPy, NOT the model object
+                super().__init__(model=model_name_str)
+                
+                # Store references
+                self.model = model_name_str  # STRING for DSPy
+                self._actual_model = actual_model  # Actual model object
                 self.history = []
                 self.kwargs = {
                     "temperature": 0.7,
                     "max_tokens": 512,
                     "top_p": 0.9,
-                    "model": self.model.model_name if hasattr(self.model, 'model_name') else "dnotitia"
+                    "model": model_name_str
                 }
             
-            def __call__(self, prompt, **kwargs):
-                response = self.model.generate(prompt, **kwargs)
+            def __call__(self, prompt=None, messages=None, **kwargs):
+                """DSPy calls this with different signatures, handle all cases."""
+                # DSPy might pass prompt or messages
+                if messages:
+                    # Handle messages format
+                    if isinstance(messages, list) and len(messages) > 0:
+                        prompt = messages[-1].get('content', '') if isinstance(messages[-1], dict) else str(messages[-1])
+                
+                if not prompt:
+                    return [""]
+                
+                # Generate response
+                response = self._actual_model.generate(prompt, **kwargs)
                 return [response]
             
             def basic_request(self, prompt, **kwargs):
-                response = self.model.generate(prompt, **kwargs)
+                """Basic request interface."""
+                if not prompt:
+                    return ""
+                response = self._actual_model.generate(prompt, **kwargs)
                 return response
         
-        return DNotitiaLM(self.model)
+        # Extract model name string
+        if hasattr(self.model, 'model_name'):
+            model_name_str = str(self.model.model_name) if self.model.model_name else "dnotitia"
+        else:
+            model_name_str = "dnotitia"
+        
+        return DNotitiaLM(model_name_str)
     
     def chat(
         self,
@@ -137,6 +164,15 @@ class MultimodalChatbot:
         Returns:
             Dictionary containing answer and metadata
         """
+        import logging
+        logging.info("="*60)
+        logging.info(f"📞 CHATBOT.chat() called")
+        logging.info(f"   question: {question}")
+        logging.info(f"   use_rag: {use_rag}, n_results: {n_results}")
+        logging.info(f"   use_dspy: {self.use_dspy}")
+        logging.info(f"   model: {self.model}")
+        logging.info("="*60)
+        
         response = {
             'question': question,
             'answer': '',
@@ -146,33 +182,57 @@ class MultimodalChatbot:
         }
         
         try:
+            logging.info(f"🔧 Starting chat processing...")
             if use_rag:
+                logging.info("📚 Using RAG pipeline...")
                 # Use RAG pipeline
                 if self.use_dspy and hasattr(self, 'rag_module'):
+                    logging.info("🔮 Using DSPy RAG module...")
                     # Use DSPy RAG module
-                    prediction = self.rag_module(question, n_results=n_results)
-                    response['answer'] = prediction.answer
-                    response['context'] = prediction.context
-                    response['sources'] = prediction.sources
+                    try:
+                        prediction = self.rag_module(question, n_results=n_results)
+                        response['answer'] = prediction.answer
+                        response['context'] = prediction.context
+                        response['sources'] = prediction.sources
+                        logging.info(f"✅ DSPy RAG completed. Answer length: {len(response['answer'])}")
+                    except Exception as e:
+                        logging.error(f"❌ DSPy RAG failed: {type(e).__name__}: {str(e)}")
+                        import traceback
+                        logging.error(traceback.format_exc())
+                        raise
                 else:
+                    logging.info("📝 Using manual RAG (no DSPy)...")
                     # Fallback to manual RAG
                     response = self._manual_rag(question, n_results)
             else:
+                logging.info("💬 Direct generation (no RAG)...")
                 # Direct generation without RAG
                 if self.model:
                     prompt = self._build_prompt(question, include_history=include_history)
+                    logging.info(f"   Calling model.generate()...")
                     answer = self.model.generate(prompt, max_new_tokens=512)
                     response['answer'] = answer
+                    logging.info(f"✅ Generation completed. Answer length: {len(answer)}")
                 else:
                     response['answer'] = "Model not initialized."
+                    logging.warning("⚠️ Model not initialized")
             
             # Add to conversation history
             self.conversation_history.append({
                 'question': question,
                 'answer': response['answer']
             })
+            logging.info(f"✅ Chat completed successfully. Returning response.")
             
         except Exception as e:
+            logging.error("="*60)
+            logging.error(f"❌ EXCEPTION in chatbot.chat(): {type(e).__name__}")
+            logging.error(f"Message: {str(e)}")
+            import traceback
+            logging.error("Full traceback:")
+            logging.error(traceback.format_exc())
+            logging.error("="*60)
+            
             response['answer'] = f"Error generating response: {str(e)}"
             response['error'] = str(e)
         
