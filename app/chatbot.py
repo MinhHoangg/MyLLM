@@ -85,14 +85,25 @@ class MultimodalChatbot:
         self.use_dspy = use_dspy
         self.conversation_history = []
         
-        # Configure DSPy if enabled
+        # Configure DSPy if enabled (with thread-safety check)
         if self.use_dspy and self.model:
             # Create a DSPy-compatible LM wrapper
             self.dspy_lm = self._create_dspy_lm()
-            dspy.settings.configure(lm=self.dspy_lm)
             
-            # Initialize RAG module
-            self.rag_module = MultimodalRAG(vector_db=self.vector_db, llm=self.dspy_lm)
+            # Only configure if not already configured (avoid threading error)
+            try:
+                if not hasattr(dspy.settings, 'lm') or dspy.settings.lm is None:
+                    dspy.settings.configure(lm=self.dspy_lm)
+            except RuntimeError as e:
+                # Already configured in another thread, just use existing settings
+                import logging
+                logging.warning(f"DSPy already configured, skipping: {e}")
+                # Disable DSPy for this instance to avoid conflicts
+                self.use_dspy = False
+            
+            # Initialize RAG module only if DSPy is still enabled
+            if self.use_dspy:
+                self.rag_module = MultimodalRAG(vector_db=self.vector_db, llm=self.dspy_lm)
     
     def _create_dspy_lm(self):
         """Create a DSPy-compatible language model wrapper."""
@@ -185,25 +196,9 @@ class MultimodalChatbot:
             logging.info(f"🔧 Starting chat processing...")
             if use_rag:
                 logging.info("📚 Using RAG pipeline...")
-                # Use RAG pipeline
-                if self.use_dspy and hasattr(self, 'rag_module'):
-                    logging.info("🔮 Using DSPy RAG module...")
-                    # Use DSPy RAG module
-                    try:
-                        prediction = self.rag_module(question, n_results=n_results)
-                        response['answer'] = prediction.answer
-                        response['context'] = prediction.context
-                        response['sources'] = prediction.sources
-                        logging.info(f"✅ DSPy RAG completed. Answer length: {len(response['answer'])}")
-                    except Exception as e:
-                        logging.error(f"❌ DSPy RAG failed: {type(e).__name__}: {str(e)}")
-                        import traceback
-                        logging.error(traceback.format_exc())
-                        raise
-                else:
-                    logging.info("📝 Using manual RAG (no DSPy)...")
-                    # Fallback to manual RAG
-                    response = self._manual_rag(question, n_results)
+                # ALWAYS use manual RAG (DSPy RAG is too slow and has threading issues)
+                logging.info("📝 Using manual RAG (faster and more stable)...")
+                response = self._manual_rag(question, n_results)
             else:
                 logging.info("💬 Direct generation (no RAG)...")
                 # Direct generation without RAG

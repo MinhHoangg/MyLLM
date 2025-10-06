@@ -50,6 +50,7 @@ def init_session_state():
         st.session_state.model = None
         st.session_state.ingestion = None
         st.session_state.confirm_clear = False
+        st.session_state.load_model_on_startup = True  # False = faster startup, loads on first chat
 
 
 @st.cache_resource
@@ -68,35 +69,54 @@ def load_vector_db():
         return None
 
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def load_model():
     """Load and cache the language model."""
+    import time
+    import logging
+    
     try:
-        st.info("🔄 Loading model... This may take 1-2 minutes...")
-        import logging
+        # Create progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        status_text.text("🔄 Step 1/3: Initializing model configuration...")
+        progress_bar.progress(10)
         logging.info("="*60)
         logging.info("STREAMLIT: Starting model load")
         logging.info("="*60)
         
+        time.sleep(0.5)
+        status_text.text("🔄 Step 2/3: Loading EXAONE-3.5-7.8B model (~90 seconds)...")
+        progress_bar.progress(20)
+        
+        start_time = time.time()
         model = DNotitiaModel(
-            model_name="dnotitia/DNA-2.0-8B",  # Primary model, will fallback to EXAONE if needed
+            model_name="dnotitia/DNA-2.0-8B",  # Will fallback to EXAONE
             max_length=2048,
             temperature=0.7
         )
+        load_time = time.time() - start_time
+        
+        progress_bar.progress(90)
+        status_text.text("🔄 Step 3/3: Finalizing model setup...")
+        time.sleep(0.3)
         
         logging.info("="*60)
-        logging.info("STREAMLIT: Model loaded successfully")
+        logging.info(f"STREAMLIT: Model loaded in {load_time:.1f}s")
         logging.info(f"Model name: {model.model_name}")
-        logging.info(f"Model name type: {type(model.model_name)}")
         logging.info("="*60)
         
-        st.success(f"✅ Model loaded: {model.model_name}")
+        progress_bar.progress(100)
+        status_text.empty()
+        progress_bar.empty()
+        
+        st.success(f"✅ Model loaded: {model.model_name.split('/')[-1]} ({load_time:.1f}s)")
         return model
+        
     except Exception as e:
         st.error(f"❌ Error loading model: {str(e)}")
-        st.error(f"Error type: {type(e).__name__}")
-        import traceback
-        st.error(f"Traceback:\n```\n{traceback.format_exc()}\n```")
+        logging.error(f"Model load error: {e}")
         st.warning("⚠️ The chatbot will work in retrieval-only mode without generation.")
         return None
 
@@ -105,18 +125,23 @@ def initialize_app():
     """Initialize the application components."""
     if not st.session_state.initialized:
         with st.spinner("Initializing application..."):
-            # Load vector database
+            # Load vector database (fast)
             st.session_state.vector_db = load_vector_db()
             
-            # Load model (optional - can work without it)
-            st.session_state.model = load_model()
+            # Load model (slow - optional based on setting)
+            if st.session_state.load_model_on_startup:
+                st.info("⏳ Loading AI model (7.8B parameters)... This takes ~90 seconds on first load.")
+                st.session_state.model = load_model()
+            else:
+                st.info("⚡ Skipped model loading for faster startup. Model will load on first chat message.")
+                st.session_state.model = None
             
-            # Initialize chatbot
+            # Initialize chatbot (disable DSPy to avoid threading issues and improve speed)
             if st.session_state.vector_db:
                 st.session_state.chatbot = MultimodalChatbot(
                     vector_db=st.session_state.vector_db,
                     model=st.session_state.model,
-                    use_dspy=True
+                    use_dspy=False  # Disabled for performance and stability
                 )
             
             # Initialize ingestion
@@ -207,6 +232,13 @@ def chat_page():
         # Generate response
         with st.chat_message("assistant"):
             with loading_spinner("Thinking..."):
+                # Lazy load model if not loaded yet
+                if st.session_state.model is None and st.session_state.chatbot:
+                    st.info("⏳ Loading AI model for the first time (~90 seconds)...")
+                    st.session_state.model = load_model()
+                    if st.session_state.model:
+                        st.session_state.chatbot.model = st.session_state.model
+                
                 if st.session_state.chatbot:
                     try:
                         logging.info(f"🤖 STREAMLIT: Calling chatbot.chat()")
