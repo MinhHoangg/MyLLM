@@ -156,10 +156,81 @@ class MultimodalChatbot:
         
         return DNotitiaLM(model_name_str)
     
+    def _get_cached_response(self, question: str) -> Optional[str]:
+        """
+        Get instant cached response for common phrases to avoid slow model generation.
+        Returns None if no cached response available.
+        """
+        question_lower = question.lower().strip()
+        
+        # Instant responses for common greetings (no model needed!)
+        cached_responses = {
+            'hello': 'Hello! How can I help you today?',
+            'hi': 'Hi there! What can I do for you?',
+            'hey': 'Hey! How can I assist you?',
+            'good morning': 'Good morning! How can I help you today?',
+            'good afternoon': 'Good afternoon! What can I do for you?',
+            'good evening': 'Good evening! How can I assist you?',
+            'how are you': 'I\'m doing great, thank you! How can I help you with your documents?',
+            'what\'s up': 'Not much! Ready to help with your questions. What do you need?',
+            'whats up': 'Not much! Ready to help with your questions. What do you need?',
+            'thanks': 'You\'re welcome!',
+            'thank you': 'You\'re very welcome!',
+            'bye': 'Goodbye! Feel free to come back if you have more questions.',
+            'goodbye': 'Goodbye! Have a great day!',
+        }
+        
+        return cached_responses.get(question_lower)
+    
+    def _should_use_rag(self, question: str) -> bool:
+        """
+        Intelligently detect if RAG is needed for this question.
+        
+        Returns True if the question likely needs document retrieval.
+        Returns False for greetings, small talk, or general questions.
+        """
+        question_lower = question.lower().strip()
+        
+        # Check if it's a simple phrase (no RAG needed)
+        if len(question_lower) < 5:
+            return False
+        
+        # Simple greetings and conversational phrases (no RAG needed)
+        simple_phrases = [
+            'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
+            'how are you', 'what\'s up', 'whats up', 'sup',
+            'thanks', 'thank you', 'bye', 'goodbye', 'see you',
+            'ok', 'okay', 'yes', 'no', 'sure', 'great', 'cool'
+        ]
+        
+        if question_lower in simple_phrases:
+            return False
+        
+        # Check if question contains document-related keywords
+        document_keywords = [
+            'document', 'file', 'pdf', 'show me', 'find', 'search',
+            'what does', 'according to', 'in the', 'from the',
+            'information about', 'tell me about', 'explain',
+            'how many', 'how much', 'percent', 'percentage',
+            'when', 'where', 'who', 'which', 'what'
+        ]
+        
+        # If question contains document keywords, use RAG
+        for keyword in document_keywords:
+            if keyword in question_lower:
+                return True
+        
+        # For short questions without keywords, no RAG
+        if len(question.split()) <= 3:
+            return False
+        
+        # For longer questions, assume they need RAG
+        return len(question.split()) > 5
+    
     def chat(
         self,
         question: str,
-        use_rag: bool = True,
+        use_rag: bool = None,  # None = auto-detect
         n_results: int = 5,
         include_history: bool = True
     ) -> Dict[str, Any]:
@@ -168,7 +239,7 @@ class MultimodalChatbot:
         
         Args:
             question: User's question
-            use_rag: Whether to use RAG for context retrieval
+            use_rag: Whether to use RAG. If None, auto-detects based on question
             n_results: Number of documents to retrieve
             include_history: Whether to include conversation history
             
@@ -176,6 +247,12 @@ class MultimodalChatbot:
             Dictionary containing answer and metadata
         """
         import logging
+        
+        # Auto-detect if RAG is needed
+        if use_rag is None:
+            use_rag = self._should_use_rag(question)
+            logging.info(f"🤖 Auto-detected RAG needed: {use_rag} for question: '{question[:50]}...'")
+        
         logging.info("="*60)
         logging.info(f"📞 CHATBOT.chat() called")
         logging.info(f"   question: {question}")
@@ -194,7 +271,14 @@ class MultimodalChatbot:
         
         try:
             logging.info(f"🔧 Starting chat processing...")
-            if use_rag:
+            
+            # OPTIMIZATION: Check for cached response first (instant!)
+            cached_answer = self._get_cached_response(question)
+            if cached_answer:
+                logging.info(f"⚡ Using cached response (instant!)")
+                response['answer'] = cached_answer
+                response['method'] = 'cached'
+            elif use_rag:
                 logging.info("📚 Using RAG pipeline...")
                 # ALWAYS use manual RAG (DSPy RAG is too slow and has threading issues)
                 logging.info("📝 Using manual RAG (faster and more stable)...")
@@ -205,7 +289,9 @@ class MultimodalChatbot:
                 if self.model:
                     prompt = self._build_prompt(question, include_history=include_history)
                     logging.info(f"   Calling model.generate()...")
-                    answer = self.model.generate(prompt, max_new_tokens=512)
+                    # Reduce tokens for simple responses
+                    max_tokens = 100 if len(question.split()) <= 5 else 512
+                    answer = self.model.generate(prompt, max_new_tokens=max_tokens)
                     response['answer'] = answer
                     logging.info(f"✅ Generation completed. Answer length: {len(answer)}")
                 else:

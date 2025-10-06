@@ -74,11 +74,21 @@ def sidebar_settings_component():
     
     # RAG settings
     st.sidebar.subheader("RAG Settings")
-    settings['use_rag'] = st.sidebar.checkbox(
-        "Use RAG",
-        value=True,
-        help="Enable Retrieval-Augmented Generation"
+    
+    rag_mode = st.sidebar.radio(
+        "RAG Mode",
+        options=["Auto-detect", "Always On", "Always Off"],
+        index=0,
+        help="Auto-detect: Smart detection (greetings=no RAG, questions=RAG)\nAlways On: Force RAG for all messages\nAlways Off: Never use RAG"
     )
+    
+    # Convert radio selection to use_rag setting
+    if rag_mode == "Auto-detect":
+        settings['use_rag'] = None  # None triggers auto-detection
+    elif rag_mode == "Always On":
+        settings['use_rag'] = True
+    else:  # "Always Off"
+        settings['use_rag'] = False
     
     settings['n_results'] = st.sidebar.slider(
         "Number of Retrieved Documents",

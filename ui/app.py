@@ -242,11 +242,15 @@ def chat_page():
                 if st.session_state.chatbot:
                     try:
                         logging.info(f"🤖 STREAMLIT: Calling chatbot.chat()")
-                        logging.info(f"   use_rag={settings['use_rag']}, n_results={settings['n_results']}")
+                        
+                        # Use RAG setting from sidebar (None = auto-detect, True = force on, False = force off)
+                        use_rag_setting = settings.get('use_rag', None)
+                        rag_mode_str = "auto-detect" if use_rag_setting is None else str(use_rag_setting)
+                        logging.info(f"   use_rag={rag_mode_str}, n_results={settings['n_results']}")
                         
                         response = st.session_state.chatbot.chat(
                             question=prompt,
-                            use_rag=settings['use_rag'],
+                            use_rag=use_rag_setting,  # None = auto-detect, True/False = force
                             n_results=settings['n_results'],
                             include_history=settings['include_history']
                         )
