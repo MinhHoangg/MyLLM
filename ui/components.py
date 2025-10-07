@@ -90,13 +90,8 @@ def sidebar_settings_component():
     else:  # "Always Off"
         settings['use_rag'] = False
     
-    settings['n_results'] = st.sidebar.slider(
-        "Number of Retrieved Documents",
-        min_value=1,
-        max_value=10,
-        value=5,
-        help="Number of relevant documents to retrieve"
-    )
+    # Use intelligent default for retrieved documents
+    settings['n_results'] = 7  # Optimal number for context window
     
     # Generation settings
     st.sidebar.subheader("Generation Settings")

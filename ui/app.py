@@ -245,7 +245,7 @@ def chat_page():
                         # Use RAG setting from sidebar (None = auto-detect, True = force on, False = force off)
                         use_rag_setting = settings.get('use_rag', None)
                         rag_mode_str = "auto-detect" if use_rag_setting is None else str(use_rag_setting)
-                        logging.info(f"   use_rag={rag_mode_str}, n_results={settings['n_results']}")
+                        logging.info(f"   use_rag={rag_mode_str}")
                         
                         response = st.session_state.chatbot.chat(
                             question=prompt,
@@ -322,12 +322,16 @@ def document_management_page():
             if uploaded_files:
                 if st.button(" Process and Add to Knowledge Base", type="primary"):
                     with loading_spinner("Processing documents..."):
-                        # Save uploaded files temporarily
+                        # Save uploaded files temporarily with original names preserved
                         temp_paths = []
+                        temp_dir = tempfile.mkdtemp()  # Create temp directory
+                        
                         for uploaded_file in uploaded_files:
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=Path(uploaded_file.name).suffix) as tmp:
+                            # Use original filename in temp directory
+                            temp_file_path = Path(temp_dir) / uploaded_file.name
+                            with open(temp_file_path, "wb") as tmp:
                                 tmp.write(uploaded_file.getbuffer())
-                                temp_paths.append(tmp.name)
+                            temp_paths.append(str(temp_file_path))
                         
                         # Process files
                         try:
@@ -358,12 +362,18 @@ def document_management_page():
                             error_message(f"Error processing files: {str(e)}")
                         
                         finally:
-                            # Clean up temporary files
-                            for path in temp_paths:
-                                try:
-                                    os.unlink(path)
-                                except:
-                                    pass
+                            # Clean up temporary files and directory
+                            try:
+                                import shutil
+                                if 'temp_dir' in locals():
+                                    shutil.rmtree(temp_dir, ignore_errors=True)
+                            except:
+                                # Fallback to individual file cleanup
+                                for path in temp_paths:
+                                    try:
+                                        os.unlink(path)
+                                    except:
+                                        pass
                         
                         st.rerun()
         else:
@@ -380,8 +390,8 @@ def document_management_page():
             # Show documents
             st.divider()
             
-            # Get documents with limit
-            documents = st.session_state.vector_db.get_all_documents(limit=50)
+            # Get all documents for management
+            documents = st.session_state.vector_db.get_all_documents()
             action = document_list_component(documents, allow_delete=True)
             
             if action == 'clear_all':
@@ -408,16 +418,8 @@ def search_page():
         key="search_query"
     )
     
-    col1, col2 = st.columns([1, 3])
-    
-    with col1:
-        n_results = st.number_input(
-            "Number of results:",
-            min_value=1,
-            max_value=20,
-            value=5,
-            key="search_n_results"
-        )
+    # Use intelligent default for search results
+    n_results = 8  # Good balance of relevance vs. performance
     
     if query:
         if st.button("🔍 Search", type="primary"):
@@ -429,7 +431,7 @@ def search_page():
                     )
                     
                     if results['documents']:
-                        success_message(f"Found {len(results['documents'])} relevant documents")
+                        success_message(f"Found {len(results['documents'])} most relevant results")
                         search_results_component(results)
                     else:
                         info_message("No documents found. Try uploading some documents first.")

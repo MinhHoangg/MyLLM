@@ -79,12 +79,18 @@ class DocumentIngestion:
         # Extract content using appropriate handler
         extracted_data = handler.extract(str(file_path))
         
-        # Save copy if requested
+        # Preserve original file name in metadata
+        extracted_data['metadata']['original_file_name'] = file_path.name
+        extracted_data['metadata']['original_file_path'] = str(file_path)
+        
+        # Save copy if requested - preserve original name
         if save_copy:
             dest_path = self.upload_dir / file_path.name
             if not dest_path.exists():
                 shutil.copy2(file_path, dest_path)
             extracted_data['metadata']['saved_path'] = str(dest_path)
+            # Ensure file_name reflects the original name
+            extracted_data['metadata']['file_name'] = file_path.name
         
         return extracted_data
     
