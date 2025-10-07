@@ -212,7 +212,12 @@ class MultimodalChatbot:
             'what does', 'according to', 'in the', 'from the',
             'information about', 'tell me about', 'explain',
             'how many', 'how much', 'percent', 'percentage',
-            'when', 'where', 'who', 'which', 'what'
+            'when', 'where', 'who', 'which', 'what',
+            # Image-related keywords
+            'image', 'picture', 'photo', 'cat', 'dog', 'animal',
+            'chart', 'graph', 'diagram', 'table', 'figure',
+            'show', 'display', 'visualize', 'illustration',
+            'describe', 'see', 'view', 'look', 'appear'
         ]
         
         # If question contains document keywords, use RAG
@@ -335,16 +340,44 @@ class MultimodalChatbot:
         Returns:
             Response dictionary
         """
+        import logging
+        
         # Retrieve relevant documents
+        logging.info(f"Searching vector DB for: '{question[:50]}...'")
         search_results = self.vector_db.search(question, n_results=n_results)
+        
+        # Log search results
+        num_results = len(search_results['documents']) if search_results['documents'] else 0
+        logging.info(f"Vector DB returned {num_results} results")
+        
+        # Check if we got any results
+        if not search_results['documents'] or len(search_results['documents']) == 0:
+            logging.warning("No documents found in vector database")
+            return {
+                'question': question,
+                'answer': "I couldn't find any relevant information in the knowledge base. Please make sure documents or images have been uploaded.",
+                'context': '',
+                'sources': [],
+                'method': 'rag'
+            }
         
         # Format context
         context_parts = []
-        for doc, metadata in zip(search_results['documents'], search_results['metadatas']):
+        for i, (doc, metadata) in enumerate(zip(search_results['documents'], search_results['metadatas'])):
             source = metadata.get('file_name', 'unknown')
-            context_parts.append(f"[Source: {source}]\n{doc}")
+            content_type = metadata.get('content_type', 'unknown')
+            
+            # Log what we found
+            logging.info(f"Result {i+1}: type={content_type}, source={source}, length={len(doc)}")
+            
+            # For images, include metadata in context
+            if content_type == 'image':
+                context_parts.append(f"[Source: {source} (Image)]\n{doc}")
+            else:
+                context_parts.append(f"[Source: {source}]\n{doc}")
         
         context = "\n\n".join(context_parts)
+        logging.info(f"Built context with {len(context_parts)} parts, total length: {len(context)}")
         
         # Build prompt with context - clean format without labels
         prompt = f"""Use the following information to answer the user's question directly and concisely.
@@ -357,11 +390,13 @@ Provide a direct answer without repeating the question or including labels:"""
         
         # Generate answer
         if self.model:
+            logging.info("Generating answer with model...")
             raw_answer = self.model.generate(prompt, max_new_tokens=4096)
             # Clean up the answer - remove common artifacts
             answer = self._clean_answer(raw_answer)
         else:
             answer = "Model not initialized."
+            logging.error("Model not initialized")
         
         return {
             'question': question,

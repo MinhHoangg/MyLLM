@@ -64,11 +64,25 @@ class CLIPEmbedder:
         
         logger.info(f"Loading CLIP model: {model_name} on {self.device}")
         
-        # Load CLIP model and processor
+        # Load CLIP model and processor with offline-first approach
         try:
-            self.model = CLIPModel.from_pretrained(model_name)
-            self.processor = CLIPProcessor.from_pretrained(model_name)
-            self.tokenizer = CLIPTokenizer.from_pretrained(model_name)
+            # Try loading from local cache first (offline mode)
+            logger.info("Checking local cache for CLIP model...")
+            try:
+                self.model = CLIPModel.from_pretrained(model_name, local_files_only=True)
+                self.processor = CLIPProcessor.from_pretrained(model_name, local_files_only=True)
+                self.tokenizer = CLIPTokenizer.from_pretrained(model_name, local_files_only=True)
+                logger.info("CLIP loaded from local cache (offline mode)")
+                
+            except Exception as cache_error:
+                logger.info("CLIP not found in cache, downloading from HuggingFace...")
+                logger.info("(This is normal on first run)")
+                
+                # Download from internet
+                self.model = CLIPModel.from_pretrained(model_name)
+                self.processor = CLIPProcessor.from_pretrained(model_name)
+                self.tokenizer = CLIPTokenizer.from_pretrained(model_name)
+                logger.info("CLIP downloaded and cached for future offline use")
             
             # Move model to device
             self.model = self.model.to(self.device)
@@ -77,9 +91,9 @@ class CLIPEmbedder:
             # Get embedding dimension
             self.embedding_dim = self.model.config.projection_dim
             
-            logger.info(f" CLIP model loaded successfully")
-            logger.info(f" Embedding dimension: {self.embedding_dim}")
-            logger.info(f" Device: {self.device}")
+            logger.info("CLIP model loaded successfully")
+            logger.info(f"Embedding dimension: {self.embedding_dim}")
+            logger.info(f"Device: {self.device}")
             
         except Exception as e:
             logger.error(f"Failed to load CLIP model: {str(e)}")
