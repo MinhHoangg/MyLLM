@@ -340,19 +340,20 @@ class MultimodalChatbot:
         
         context = "\n\n".join(context_parts)
         
-        # Build prompt with context
-        prompt = f"""Based on the following context, answer the question.
+        # Build prompt with context - clean format without labels
+        prompt = f"""Use the following information to answer the user's question directly and concisely.
 
-Context:
 {context}
 
-Question: {question}
+User's question: {question}
 
-Answer:"""
+Provide a direct answer without repeating the question or including labels:"""
         
         # Generate answer
         if self.model:
-            answer = self.model.generate(prompt, max_new_tokens=4096)
+            raw_answer = self.model.generate(prompt, max_new_tokens=4096)
+            # Clean up the answer - remove common artifacts
+            answer = self._clean_answer(raw_answer)
         else:
             answer = "Model not initialized."
         
@@ -363,6 +364,41 @@ Answer:"""
             'sources': search_results['metadatas'],
             'method': 'rag'
         }
+    
+    def _clean_answer(self, answer: str) -> str:
+        """
+        Clean up the answer by removing common artifacts and labels.
+        
+        Args:
+            answer: Raw answer from model
+            
+        Returns:
+            Cleaned answer
+        """
+        import re
+        
+        # Remove common label patterns at the start
+        patterns_to_remove = [
+            r'^Context:\s*.*?(?=\n\n|\Z)',  # Remove "Context: ..."
+            r'^Question:\s*.*?(?=\n\n|\Z)',  # Remove "Question: ..."
+            r'^Answer:\s*',  # Remove "Answer: " prefix
+            r'^Based on the following context,?\s*',  # Remove instruction echoes
+            r'^User\'?s? question:\s*.*?(?=\n\n|\Z)',  # Remove "User's question: ..."
+        ]
+        
+        cleaned = answer.strip()
+        
+        # Apply each pattern
+        for pattern in patterns_to_remove:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.MULTILINE)
+        
+        # Remove any leading/trailing whitespace and empty lines
+        cleaned = cleaned.strip()
+        
+        # Remove duplicate newlines
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        
+        return cleaned
     
     def _build_prompt(self, question: str, include_history: bool = True) -> str:
         """

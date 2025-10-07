@@ -170,46 +170,29 @@ def chat_page():
         if st.session_state.model:
             try:
                 model_info = st.session_state.model.get_model_info()
-                
-                # Show active model with robust error handling
                 model_name = model_info.get('model_name', 'Unknown')
                 
-                # Ensure model_name is a string
+                # Ensure model_name is a string (log errors to terminal)
                 if not isinstance(model_name, str):
-                    st.error(f"⚠️ DEBUG: model_name is {type(model_name).__name__}, not string")
-                    st.error(f"Value: {repr(model_name)}")
+                    logging.error(f"⚠️ model_name is {type(model_name).__name__}, not string: {repr(model_name)}")
                     model_name = str(model_name) if model_name else 'Unknown'
                 
-                # Safely extract display name
+                # Safely extract display name (log errors to terminal)
                 try:
                     display_name = model_name.split('/')[-1] if '/' in model_name else model_name
                 except AttributeError as e:
-                    st.error(f"❌ Split Error: {str(e)}")
-                    st.error(f"Type: {type(model_name)}, Value: {repr(model_name)}")
-                    display_name = 'Error'
+                    logging.error(f"❌ Split Error: {str(e)} | Type: {type(model_name)}, Value: {repr(model_name)}")
+                    display_name = 'Unknown'
                 
+                # Clean display
                 st.text(f"Model: {display_name}")
                 st.text(f"Device: {model_info.get('device', 'Unknown')}")
-                
-                # Show model parameters
-                if 'parameters' in model_info:
-                    st.text(f"Size: {model_info['parameters']}")
-                
-                # Show high_parameter status
-                if 'high_parameter' in model_info:
-                    high_param_status = "High (7.8B)" if model_info['high_parameter'] else "Low (1.2B)"
-                    st.text(f"Variant: {high_param_status}")
-                
-                # Show if using fallback
-                if model_info.get('is_fallback', False):
-                    st.info(f"ℹ️ Using fallback model\n(Primary model pending approval)")
             except Exception as e:
-                st.error(f"❌ Error getting model info: {str(e)}")
-                st.error(f"Error type: {type(e).__name__}")
-                import traceback
-                st.error(f"Traceback:\n{traceback.format_exc()}")
+                logging.error(f"❌ Error getting model info: {str(e)}")
+                logging.error(traceback.format_exc())
+                st.text("Model: Loading...")
         else:
-            st.warning("Model not loaded")
+            st.text("Model: Not loaded")
         
         if st.session_state.vector_db:
             stats = st.session_state.vector_db.get_collection_stats()
@@ -269,40 +252,31 @@ def chat_page():
                             include_history=settings['include_history']
                         )
                         
-                        # DETAILED RESPONSE LOGGING
+                        # Log response details to terminal only
                         logging.info("="*60)
                         logging.info("✅ STREAMLIT: Got response from chatbot.chat()")
                         logging.info(f"Response keys: {list(response.keys())}")
-                        logging.info(f"Response types: {[(k, type(v).__name__) for k, v in response.items()]}")
                         
-                        # Log each field
+                        # Log each field to terminal
                         for key, value in response.items():
                             if key == 'answer':
-                                val_str = str(value)[:200] if len(str(value)) > 200 else str(value)
-                                logging.info(f"  answer: {val_str}")
+                                val_str = str(value)[:5000] if len(str(value)) > 5000 else str(value)
+                                logging.info(f"  answer: {val_str}...")
                             elif key == 'error':
-                                logging.error(f"  ❌ ERROR in response.error: {value}")
+                                logging.error(f"  ❌ ERROR: {value}")
                             else:
                                 logging.info(f"  {key}: {value}")
                         logging.info("="*60)
                         
+                        # Get answer
                         answer = response.get('answer', 'No answer generated.')
                         
-                        # Check if error in response
+                        # Log errors to terminal only (don't show in UI)
                         if 'error' in response:
-                            st.error(f"❌ Error: {response['error']}")
-                            import traceback
-                            if 'split' in str(response['error']).lower():
-                                st.error("🐛 DEBUG: This is the SPLIT error!")
-                                st.error(f"Full error: {response.get('error')}")
+                            logging.error(f"❌ Error in response: {response['error']}")
                         
+                        # Display ONLY the answer - clean UI
                         st.markdown(answer)
-                        
-                        # Show sources if available
-                        if response.get('sources'):
-                            with st.expander("📚 View Sources"):
-                                for idx, source in enumerate(response['sources'][:3], 1):
-                                    st.text(f"{idx}. {source.get('file_name', 'Unknown')}")
                     except Exception as e:
                         import logging
                         import traceback
