@@ -127,7 +127,7 @@ class DNotitiaModel:
     def generate(
         self,
         prompt: str,
-        max_new_tokens: int = 512,
+        max_new_tokens: int = 4096,
         temperature: Optional[float] = None,
         top_p: Optional[float] = None,
         do_sample: bool = True,

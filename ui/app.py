@@ -245,11 +245,13 @@ def chat_page():
                 # Lazy load model if not loaded yet
                 if st.session_state.model is None and st.session_state.chatbot:
                     high_param = st.session_state.get('high_parameter', False)
-                    load_time = "~90 seconds" if high_param else "~20-30 seconds"
-                    st.info(f"⏳ Loading AI model for the first time ({load_time})...")
-                    st.session_state.model = load_model()
+                    load_time = "~90 seconds" if high_param else "~40-50 seconds"
+                    # Log to terminal instead of showing in UI
+                    logging.info(f"⏳ Loading AI model for the first time ({load_time})...")
+                    st.session_state.model = load_model(_high_parameter=high_param)
                     if st.session_state.model:
                         st.session_state.chatbot.model = st.session_state.model
+                    logging.info("✅ Model loaded successfully!")
                 
                 if st.session_state.chatbot:
                     try:
@@ -305,6 +307,7 @@ def chat_page():
                         import logging
                         import traceback
                         
+                        # Log full error details to terminal
                         logging.error("="*60)
                         logging.error(f"❌ STREAMLIT EXCEPTION: {type(e).__name__}")
                         logging.error(f"Message: {str(e)}")
@@ -312,17 +315,8 @@ def chat_page():
                         logging.error(traceback.format_exc())
                         logging.error("="*60)
                         
-                        answer = f"Error generating response: {str(e)}"
-                        st.error(f"❌ Chat Error: {str(e)}")
-                        st.error(f"Error type: {type(e).__name__}")
-                        
-                        # Special handling for split error
-                        if "'DNotitiaModel' object has no attribute 'split'" in str(e):
-                            st.error("🐛 **SPLIT ERROR DETECTED!**")
-                            st.error("This means somewhere the code is trying to call .split() on the model object instead of a string")
-                            st.error(f"Check terminal logs for full traceback")
-                        
-                        st.error(f"Traceback:\n```python\n{traceback.format_exc()}\n```")
+                        # Show clean error message in UI only
+                        answer = "I apologize, but I encountered an error processing your request. Please check the terminal logs for details."
                         st.markdown(answer)
                 else:
                     answer = "Chatbot not initialized. Please check the configuration."

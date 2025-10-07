@@ -208,7 +208,7 @@ class ExaoneModel:
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens or 512,
+                max_new_tokens=max_new_tokens or 4096,
                 temperature=temp,
                 top_p=top_p_val,
                 do_sample=True if temp > 0 else False,

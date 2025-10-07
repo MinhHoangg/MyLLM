@@ -121,7 +121,7 @@ class MultimodalChatbot:
                 self.history = []
                 self.kwargs = {
                     "temperature": 0.7,
-                    "max_tokens": 512,
+                    "max_tokens": 4096,
                     "top_p": 0.9,
                     "model": model_name_str
                 }
@@ -289,9 +289,8 @@ class MultimodalChatbot:
                 if self.model:
                     prompt = self._build_prompt(question, include_history=include_history)
                     logging.info(f"   Calling model.generate()...")
-                    # Reduce tokens for simple responses
-                    max_tokens = 100 if len(question.split()) <= 5 else 512
-                    answer = self.model.generate(prompt, max_new_tokens=max_tokens)
+                    # Allow unlimited length responses
+                    answer = self.model.generate(prompt, max_new_tokens=4096)
                     response['answer'] = answer
                     logging.info(f"✅ Generation completed. Answer length: {len(answer)}")
                 else:
@@ -353,7 +352,7 @@ Answer:"""
         
         # Generate answer
         if self.model:
-            answer = self.model.generate(prompt, max_new_tokens=512)
+            answer = self.model.generate(prompt, max_new_tokens=4096)
         else:
             answer = "Model not initialized."
         
