@@ -251,14 +251,20 @@ class MultimodalChatbot:
         # Auto-detect if RAG is needed
         if use_rag is None:
             use_rag = self._should_use_rag(question)
-            logging.info(f"🤖 Auto-detected RAG needed: {use_rag} for question: '{question[:50]}...'")
+            logging.info(f" Auto-detected RAG needed: {use_rag} for question: '{question[:50]}...'")
+        
+        import json
         
         logging.info("="*60)
-        logging.info(f"📞 CHATBOT.chat() called")
-        logging.info(f"   question: {question}")
-        logging.info(f"   use_rag: {use_rag}, n_results: {n_results}")
-        logging.info(f"   use_dspy: {self.use_dspy}")
-        logging.info(f"   model: {self.model}")
+        logging.info("CHATBOT.chat() called")
+        call_params = {
+            "question": question[:100] + "..." if len(question) > 100 else question,
+            "use_rag": use_rag,
+            "n_results": n_results,
+            "use_dspy": self.use_dspy,
+            "model": str(self.model)[:50]
+        }
+        logging.info(f"Parameters: {json.dumps(call_params, indent=2)}")
         logging.info("="*60)
         
         response = {
@@ -270,21 +276,21 @@ class MultimodalChatbot:
         }
         
         try:
-            logging.info(f"🔧 Starting chat processing...")
+            logging.info(f" Starting chat processing...")
             
             # OPTIMIZATION: Check for cached response first (instant!)
             cached_answer = self._get_cached_response(question)
             if cached_answer:
-                logging.info(f"⚡ Using cached response (instant!)")
+                logging.info(f" Using cached response (instant!)")
                 response['answer'] = cached_answer
                 response['method'] = 'cached'
             elif use_rag:
-                logging.info("📚 Using RAG pipeline...")
+                logging.info(" Using RAG pipeline...")
                 # ALWAYS use manual RAG (DSPy RAG is too slow and has threading issues)
-                logging.info("📝 Using manual RAG (faster and more stable)...")
+                logging.info(" Using manual RAG (faster and more stable)...")
                 response = self._manual_rag(question, n_results)
             else:
-                logging.info("💬 Direct generation (no RAG)...")
+                logging.info(" Direct generation (no RAG)...")
                 # Direct generation without RAG
                 if self.model:
                     prompt = self._build_prompt(question, include_history=include_history)
@@ -292,21 +298,21 @@ class MultimodalChatbot:
                     # Allow unlimited length responses
                     answer = self.model.generate(prompt, max_new_tokens=4096)
                     response['answer'] = answer
-                    logging.info(f"✅ Generation completed. Answer length: {len(answer)}")
+                    logging.info(f" Generation completed. Answer length: {len(answer)}")
                 else:
                     response['answer'] = "Model not initialized."
-                    logging.warning("⚠️ Model not initialized")
+                    logging.warning("WARNING: Model not initialized")
             
             # Add to conversation history
             self.conversation_history.append({
                 'question': question,
                 'answer': response['answer']
             })
-            logging.info(f"✅ Chat completed successfully. Returning response.")
+            logging.info(f" Chat completed successfully. Returning response.")
             
         except Exception as e:
             logging.error("="*60)
-            logging.error(f"❌ EXCEPTION in chatbot.chat(): {type(e).__name__}")
+            logging.error(f" EXCEPTION in chatbot.chat(): {type(e).__name__}")
             logging.error(f"Message: {str(e)}")
             import traceback
             logging.error("Full traceback:")
@@ -377,6 +383,20 @@ Provide a direct answer without repeating the question or including labels:"""
         """
         import re
         
+        cleaned = answer.strip()
+        
+        # First, remove any repeated source context blocks that appear at the start
+        # This handles when the model repeats "[Source: file.pdf] content..." from the prompt
+        cleaned = re.sub(r'^(?:\[Source:.*?\].*?(?=\n\n|\Z)\s*)+', '', cleaned, flags=re.DOTALL | re.MULTILINE)
+        
+        # Remove the instruction text if model repeats it
+        cleaned = re.sub(
+            r'^Use the following information to answer.*?Provide a direct answer without repeating.*?:\s*',
+            '',
+            cleaned,
+            flags=re.DOTALL | re.IGNORECASE
+        )
+        
         # Remove common label patterns at the start
         patterns_to_remove = [
             r'^Context:\s*.*?(?=\n\n|\Z)',  # Remove "Context: ..."
@@ -384,9 +404,8 @@ Provide a direct answer without repeating the question or including labels:"""
             r'^Answer:\s*',  # Remove "Answer: " prefix
             r'^Based on the following context,?\s*',  # Remove instruction echoes
             r'^User\'?s? question:\s*.*?(?=\n\n|\Z)',  # Remove "User's question: ..."
+            r'^Provide a direct answer.*?:\s*',  # Remove instruction echo
         ]
-        
-        cleaned = answer.strip()
         
         # Apply each pattern
         for pattern in patterns_to_remove:

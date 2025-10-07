@@ -77,9 +77,9 @@ class CLIPEmbedder:
             # Get embedding dimension
             self.embedding_dim = self.model.config.projection_dim
             
-            logger.info(f"✅ CLIP model loaded successfully")
-            logger.info(f"   Embedding dimension: {self.embedding_dim}")
-            logger.info(f"   Device: {self.device}")
+            logger.info(f" CLIP model loaded successfully")
+            logger.info(f" Embedding dimension: {self.embedding_dim}")
+            logger.info(f" Device: {self.device}")
             
         except Exception as e:
             logger.error(f"Failed to load CLIP model: {str(e)}")
@@ -338,7 +338,7 @@ class HybridEmbedder:
         else:
             self.text_embedder = None
         
-        logger.info("✅ Hybrid embedder initialized")
+        logger.info(f" Hybrid embedder initialized")
     
     def encode_text(
         self,

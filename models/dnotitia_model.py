@@ -58,7 +58,7 @@ class DNotitiaModel:
         top_p: float = 0.9,
         hf_token: Optional[str] = None,
         use_fallback: bool = True,
-        high_parameter: bool = False  # Default to 1.2B model (faster, lower memory)
+        high_parameter: bool = False  # Default to 2.4B model (balanced, efficient)
     ):
         """
         Initialize the model with automatic fallback support.
@@ -67,12 +67,12 @@ class DNotitiaModel:
         the same external interface for backward compatibility.
         
         Args:
-            high_parameter: If True, use EXAONE-3.5-7.8B (7.8B); If False, use EXAONE-4.0-1.2B (1.2B, faster)
+            high_parameter: If True, use EXAONE-3.5-7.8B (7.8B); If False, use EXAONE-3.5-2.4B (2.4B, balanced)
         """
-        logger.info("🔄 Using new separated model architecture")
-        logger.info(f"   Primary: dnotitia_primary_model.py")
-        logger.info(f"   Fallback: exaone_fallback_model.py")
-        logger.info(f"   Manager: model_manager.py")
+        logger.info(f" Using new separated model architecture")
+        logger.info(f" Primary: dnotitia_primary_model.py")
+        logger.info(f" Fallback: exaone_fallback_model.py")
+        logger.info(f" Manager: model_manager.py")
         
         # Store parameters for compatibility
         self.requested_model = model_name
@@ -104,20 +104,20 @@ class DNotitiaModel:
             # CRITICAL: Ensure model_name is ALWAYS a string (fix for split error)
             raw_model_name = model_info.get('model_name', 'Unknown')
             if not isinstance(raw_model_name, str):
-                logger.error(f"⚠️ BUG FOUND: model_name is {type(raw_model_name)}, not str!")
-                logger.error(f"   Value: {repr(raw_model_name)}")
+                logger.error(f"WARNING: BUG FOUND: model_name is {type(raw_model_name)}, not str!")
+                logger.error(f" Value: {repr(raw_model_name)}")
                 self.model_name = str(raw_model_name) if raw_model_name else "Unknown"
             else:
                 self.model_name = raw_model_name
             
             self.device = model_info.get('device', 'cpu')
             
-            logger.info(f"✅ Model wrapper initialized")
-            logger.info(f"   Active model: {self.model_name} (type: {type(self.model_name).__name__})")
-            logger.info(f"   Device: {self.device}")
+            logger.info(f" Model wrapper initialized")
+            logger.info(f" Active model: {self.model_name} (type: {type(self.model_name).__name__})")
+            logger.info(f" Device: {self.device}")
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize model manager: {e}")
+            logger.error(f" Failed to initialize model manager: {e}")
             # For compatibility, still set these attributes
             self.manager = None
             self.model_name = None

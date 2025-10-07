@@ -62,7 +62,7 @@ class DNotitiaModel:
                 self.device = "mps"
             else:
                 self.device = "cpu"
-                logger.warning("⚠️ Using CPU - this model will be slow without GPU")
+                logger.warning(f"WARNING: Using CPU - this model will be slow without GPU")
         else:
             self.device = device
         
@@ -83,21 +83,21 @@ class DNotitiaModel:
             RuntimeError: If authentication fails or model loading fails
         """
         model_name = self.MODEL_CONFIG["name"]
-        logger.info(f"🔄 Loading DNotitia model: {model_name}")
+        logger.info(f" Loading DNotitia model: {model_name}")
         
         # Check authentication
         if not self.hf_token:
-            logger.warning("⚠️ No HF token provided - attempting without authentication")
+            logger.warning(f"WARNING: No HF token provided - attempting without authentication")
         
         # Prepare authentication kwargs
         auth_kwargs = {}
         if self.hf_token:
             auth_kwargs["token"] = self.hf_token
-            logger.info("🔑 Using provided HF token for authentication")
+            logger.info(f" Using provided HF token for authentication")
         
         try:
             # Load tokenizer
-            logger.info("📝 Loading tokenizer...")
+            logger.info(f" Loading tokenizer...")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_name,
                 trust_remote_code=True,
@@ -107,12 +107,12 @@ class DNotitiaModel:
             # Set padding token if not set
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
-                logger.info("🔧 Set padding token to EOS token")
+                logger.info(f" Set padding token to EOS token")
             
             # Load model with appropriate dtype
-            logger.info("🚀 Loading model weights...")
+            logger.info(f" Loading model weights...")
             dtype = torch.float16 if self.device in ["cuda", "mps"] else torch.float32
-            logger.info(f"📊 Using dtype: {dtype}")
+            logger.info(f" Using dtype: {dtype}")
             
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
@@ -128,29 +128,29 @@ class DNotitiaModel:
             self.model.eval()
             
             # Log success
-            logger.info("✅ DNotitia DNA-2.0-8B loaded successfully!")
-            logger.info(f"   Device: {self.device}")
-            logger.info(f"   Vocab size: {self.tokenizer.vocab_size:,}")
-            logger.info(f"   Model parameters: ~8B")
+            logger.info(f" DNotitia DNA-2.0-8B loaded successfully!")
+            logger.info(f" Device: {self.device}")
+            logger.info(f" Vocab size: {self.tokenizer.vocab_size:,}")
+            logger.info(f" Model parameters: ~8B")
             
         except Exception as e:
             error_str = str(e)
             
             # Specific error handling
             if "401" in error_str or "403" in error_str:
-                error_msg = "🔒 Authentication failed for DNotitia DNA-2.0-8B"
-                error_msg += "\n💡 This model requires approval or a valid HF token"
+                error_msg = " Authentication failed for DNotitia DNA-2.0-8B"
+                error_msg += "\n This model requires approval or a valid HF token"
                 error_msg += f"\n🔗 Request access: https://huggingface.co/{model_name}"
                 logger.error(error_msg)
                 raise RuntimeError(f"Authentication required: {error_str}")
             elif "out of memory" in error_str.lower():
-                error_msg = "💾 Out of memory loading DNotitia DNA-2.0-8B"
-                error_msg += f"\n📊 This model requires ~{self.MODEL_CONFIG['min_vram_gb']}GB VRAM"
-                error_msg += f"\n💡 Try using CPU (slower) or close other applications"
+                error_msg = " Out of memory loading DNotitia DNA-2.0-8B"
+                error_msg += f"\n This model requires ~{self.MODEL_CONFIG['min_vram_gb']}GB VRAM"
+                error_msg += f"\n Try using CPU (slower) or close other applications"
                 logger.error(error_msg)
                 raise RuntimeError(f"Memory error: {error_str}")
             else:
-                logger.error(f"❌ Failed to load DNotitia DNA-2.0-8B: {error_str}")
+                logger.error(f" Failed to load DNotitia DNA-2.0-8B: {error_str}")
                 raise RuntimeError(f"Model loading failed: {error_str}")
     
     def generate(
@@ -183,7 +183,7 @@ class DNotitiaModel:
         temp = temperature if temperature is not None else self.temperature
         top_p_val = top_p if top_p is not None else self.top_p
         
-        logger.debug(f"🤖 Generating with DNA-2.0-8B | temp={temp}, top_p={top_p_val}")
+        logger.debug(f" Generating with DNA-2.0-8B | temp={temp}, top_p={top_p_val}")
         
         # Tokenize input
         inputs = self.tokenizer(
@@ -214,7 +214,7 @@ class DNotitiaModel:
         if generated_text.startswith(prompt):
             generated_text = generated_text[len(prompt):].strip()
         
-        logger.debug(f"✅ Generated {len(generated_text)} characters")
+        logger.debug(f" Generated {len(generated_text)} characters")
         return generated_text
     
     def __call__(self, prompt: str, **kwargs) -> str:

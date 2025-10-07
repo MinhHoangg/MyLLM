@@ -68,16 +68,16 @@ class MultimodalVectorDatabase:
             )
             self.embedding_dim = self.embedder.clip_embedder.embedding_dim
         else:
-            logger.info("📝 Using text-only embeddings (sentence-transformers)")
+            logger.info(f" Using text-only embeddings (sentence-transformers)")
             self.embedder = SentenceTransformer(text_model)
             self.embedding_dim = self.embedder.get_sentence_embedding_dimension()
         
         # Get or create collections
         self.collection = self._get_or_create_collection()
         
-        logger.info(f"✅ Vector database initialized")
-        logger.info(f"   CLIP enabled: {use_clip}")
-        logger.info(f"   Embedding dimension: {self.embedding_dim}")
+        logger.info(f" Vector database initialized")
+        logger.info(f" CLIP enabled: {use_clip}")
+        logger.info(f" Embedding dimension: {self.embedding_dim}")
     
     def _get_or_create_collection(self):
         """Get existing collection or create new one."""
@@ -170,7 +170,7 @@ class MultimodalVectorDatabase:
             ids=ids
         )
         
-        logger.info(f"✅ Added {len(documents)} text documents")
+        logger.info(f" Added {len(documents)} text documents")
         return ids
     
     def add_image_documents(
@@ -250,7 +250,7 @@ class MultimodalVectorDatabase:
             ids=ids
         )
         
-        logger.info(f"✅ Added {len(image_documents)} image documents with CLIP embeddings")
+        logger.info(f" Added {len(image_documents)} image documents with CLIP embeddings")
         return ids
     
     def _add_image_documents_text_only(

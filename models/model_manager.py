@@ -40,7 +40,7 @@ class ModelManager:
         
         Args:
             prefer_primary: If True, try primary model first
-            high_parameter: If True, use EXAONE-3.5-7.8B (7.8B params); If False, use EXAONE-4.0-1.2B (1.2B params, faster)
+            high_parameter: If True, use EXAONE-3.5-7.8B (7.8B params); If False, use EXAONE-3.5-2.4B (2.4B params, balanced)
             hf_token: Hugging Face token for primary model
             device: Device preference ('cuda', 'mps', 'cpu', or None)
             max_length: Maximum sequence length
@@ -71,7 +71,7 @@ class ModelManager:
         1. If prefer_primary: Try DNotitia → EXAONE
         2. If not prefer_primary: Try EXAONE → DNotitia
         """
-        logger.info("🚀 Starting model loading with automatic fallback...")
+        logger.info(f" Starting model loading with automatic fallback...")
         
         if self.prefer_primary:
             self._try_primary_then_fallback()
@@ -79,17 +79,17 @@ class ModelManager:
             self._try_fallback_then_primary()
         
         if self.active_model is None:
-            raise RuntimeError("❌ Failed to load any model (both primary and fallback failed)")
+            raise RuntimeError(" Failed to load any model (both primary and fallback failed)")
         
         # Log final status
         model_info = self.active_model.get_model_info()
-        logger.info(f"✅ Active model: {model_info['model_name']}")
-        logger.info(f"   Type: {model_info['model_type']}")
-        logger.info(f"   Device: {model_info['device']}")
+        logger.info(f" Active model: {model_info['model_name']}")
+        logger.info(f" Type: {model_info['model_type']}")
+        logger.info(f" Device: {model_info['device']}")
     
     def _try_primary_then_fallback(self):
         """Try primary model first, then fallback."""
-        logger.info("🎯 Strategy: Primary (DNotitia) → Fallback (EXAONE)")
+        logger.info(f" Strategy: Primary (DNotitia) → Fallback (EXAONE)")
         
         # Try primary model
         try:
@@ -106,8 +106,8 @@ class ModelManager:
             return
             
         except Exception as e:
-            logger.warning(f"⚠️ Primary model failed: {str(e)}")
-            logger.info("🔄 Falling back to EXAONE model...")
+            logger.warning(f"WARNING: Primary model failed: {str(e)}")
+            logger.info(f" Falling back to EXAONE model...")
         
         # Try fallback model
         try:
@@ -122,15 +122,15 @@ class ModelManager:
             )
             self.active_model = self.fallback_model
             logger.info("🎉 Fallback model loaded successfully!")
-            logger.info("ℹ️ Using fallback model (primary model unavailable)")
+            logger.info(f"INFO: Using fallback model (primary model unavailable)")
             
         except Exception as e:
-            logger.error(f"❌ Fallback model also failed: {str(e)}")
+            logger.error(f" Fallback model also failed: {str(e)}")
             self.active_model = None
     
     def _try_fallback_then_primary(self):
         """Try fallback model first, then primary."""
-        logger.info("🎯 Strategy: Fallback (EXAONE) → Primary (DNotitia)")
+        logger.info(f" Strategy: Fallback (EXAONE) → Primary (DNotitia)")
         
         # Try fallback model
         try:
@@ -148,8 +148,8 @@ class ModelManager:
             return
             
         except Exception as e:
-            logger.warning(f"⚠️ Fallback model failed: {str(e)}")
-            logger.info("🔄 Trying primary model...")
+            logger.warning(f"WARNING: Fallback model failed: {str(e)}")
+            logger.info(f" Trying primary model...")
         
         # Try primary model
         try:
@@ -165,7 +165,7 @@ class ModelManager:
             logger.info("🎉 Primary model loaded successfully!")
             
         except Exception as e:
-            logger.error(f"❌ Primary model also failed: {str(e)}")
+            logger.error(f" Primary model also failed: {str(e)}")
             self.active_model = None
     
     def generate(
@@ -244,18 +244,18 @@ class ModelManager:
         try:
             if use_primary and self.primary_model is not None:
                 self.active_model = self.primary_model
-                logger.info("🔄 Switched to primary model (DNotitia)")
+                logger.info(f" Switched to primary model (DNotitia)")
                 return True
             elif not use_primary and self.fallback_model is not None:
                 self.active_model = self.fallback_model
-                logger.info("🔄 Switched to fallback model (EXAONE)")
+                logger.info(f" Switched to fallback model (EXAONE)")
                 return True
             else:
-                logger.warning("⚠️ Requested model not available")
+                logger.warning(f"WARNING: Requested model not available")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Failed to switch model: {e}")
+            logger.error(f" Failed to switch model: {e}")
             return False
     
     def get_available_models(self) -> Dict[str, bool]:
@@ -275,7 +275,7 @@ class ModelManager:
         """
         Reload all models (useful for debugging).
         """
-        logger.info("🔄 Reloading all models...")
+        logger.info(f" Reloading all models...")
         
         # Clear existing models
         self.primary_model = None

@@ -4,6 +4,8 @@ Main Streamlit Application: Entry point for the multimodal chatbot UI.
 
 import streamlit as st
 import sys
+import json
+import logging
 from pathlib import Path
 
 # Add parent directory to path
@@ -33,7 +35,7 @@ import os
 # Page configuration
 st.set_page_config(
     page_title="Multimodal RAG Chatbot",
-    page_icon="🤖",
+    page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -51,7 +53,7 @@ def init_session_state():
         st.session_state.ingestion = None
         st.session_state.confirm_clear = False
         st.session_state.load_model_on_startup = True  # False = faster startup, loads on first chat
-        st.session_state.high_parameter = False  # False = 1.2B model (default, faster), True = 7.8B model
+        st.session_state.high_parameter = False  # False = 2.4B model (default, balanced), True = 7.8B model
 
 
 @st.cache_resource
@@ -94,10 +96,10 @@ def initialize_app():
             if st.session_state.load_model_on_startup:
                 high_param = st.session_state.get('high_parameter', False)
                 param_size = "7.8B, ~90s" if high_param else "2.4B, ~40-50s"
-                st.info(f"⏳ Loading AI model ({param_size})...")
+                st.info(f" Loading AI model ({param_size})...")
                 st.session_state.model = load_model(_high_parameter=high_param)
             else:
-                st.info("⚡ Skipped model loading for faster startup. Model will load on first chat message.")
+                st.info(" Skipped model loading for faster startup. Model will load on first chat message.")
                 st.session_state.model = None
             
             # Initialize chatbot (disable DSPy to avoid threading issues and improve speed)
@@ -117,14 +119,14 @@ def initialize_app():
 def chat_page():
     """Render the main chat page."""
     import logging
-    logging.info("📄 STREAMLIT: Rendering chat page")
+    logging.info(" STREAMLIT: Rendering chat page")
     
-    st.title("🤖 Multimodal RAG Chatbot")
+    st.title(" Multimodal RAG Chatbot")
     st.markdown("Ask questions about your uploaded documents!")
     
     # Sidebar settings
     settings = sidebar_settings_component()
-    logging.info(f"⚙️ STREAMLIT: Settings loaded: {settings}")
+    logging.info(f"STREAMLIT: Settings loaded: {json.dumps(settings, indent=2, default=str)}")
     
     # Sidebar info
     with st.sidebar:
@@ -138,19 +140,19 @@ def chat_page():
         new_high_param = st.checkbox(
             "Use High-Performance Model (7.8B)",
             value=current_high_param,
-            help="✅ True: EXAONE-3.5-7.8B (7.8B params, high quality, ~15.6GB VRAM, ~2-3 min load)\n"
-                 "❌ False: EXAONE-3.5-2.4B (2.4B params, balanced, ~4.8GB VRAM, ~40-50s load)",
+            help=" True: EXAONE-3.5-7.8B (7.8B params, high quality, ~15.6GB VRAM, ~2-3 min load)\n"
+                 " False: EXAONE-3.5-2.4B (2.4B params, balanced, ~4.8GB VRAM, ~40-50s load)",
             key="high_param_checkbox"
         )
         
         # Show current model size
         model_size_text = "7.8B (High Performance)" if new_high_param else "2.4B (Balanced)"
-        st.caption(f"📊 Selected: {model_size_text}")
+        st.caption(f" Selected: {model_size_text}")
         
         # Detect if setting changed - show reload button
         if new_high_param != current_high_param:
-            st.warning("⚠️ Model setting changed. Click button below to reload.")
-            if st.button("🔄 Reload Model Now", type="primary", use_container_width=True):
+            st.warning("WARNING: Model setting changed. Click button below to reload.")
+            if st.button(" Reload Model Now", type="primary", use_container_width=True):
                 with st.spinner("Reloading model... Please wait."):
                     # Clear the cache
                     load_model.clear()
@@ -162,11 +164,11 @@ def chat_page():
                     # Update chatbot's model reference
                     if st.session_state.chatbot:
                         st.session_state.chatbot.model = new_model
-                    st.success(f"✅ Model reloaded! Now using {'7.8B' if new_high_param else '2.4B'} variant.")
+                    st.success(f" Model reloaded! Now using {'7.8B' if new_high_param else '2.4B'} variant.")
                     st.rerun()
         
         st.divider()
-        st.subheader("📊 System Info")
+        st.subheader(" System Info")
         if st.session_state.model:
             try:
                 model_info = st.session_state.model.get_model_info()
@@ -174,21 +176,21 @@ def chat_page():
                 
                 # Ensure model_name is a string (log errors to terminal)
                 if not isinstance(model_name, str):
-                    logging.error(f"⚠️ model_name is {type(model_name).__name__}, not string: {repr(model_name)}")
+                    logging.error(f"WARNING: model_name is {type(model_name).__name__}, not string: {repr(model_name)}")
                     model_name = str(model_name) if model_name else 'Unknown'
                 
                 # Safely extract display name (log errors to terminal)
                 try:
                     display_name = model_name.split('/')[-1] if '/' in model_name else model_name
                 except AttributeError as e:
-                    logging.error(f"❌ Split Error: {str(e)} | Type: {type(model_name)}, Value: {repr(model_name)}")
+                    logging.error(f" Split Error: {str(e)} | Type: {type(model_name)}, Value: {repr(model_name)}")
                     display_name = 'Unknown'
                 
                 # Clean display
                 st.text(f"Model: {display_name}")
                 st.text(f"Device: {model_info.get('device', 'Unknown')}")
             except Exception as e:
-                logging.error(f"❌ Error getting model info: {str(e)}")
+                logging.error(f" Error getting model info: {str(e)}")
                 logging.error(traceback.format_exc())
                 st.text("Model: Loading...")
         else:
@@ -213,7 +215,7 @@ def chat_page():
     if prompt := st.chat_input("Ask a question about your documents..."):
         import logging
         logging.info("="*60)
-        logging.info(f"💬 STREAMLIT: User input: {prompt}")
+        logging.info(f" STREAMLIT: User input: {prompt}")
         logging.info("="*60)
         
         # Add user message to chat
@@ -230,15 +232,15 @@ def chat_page():
                     high_param = st.session_state.get('high_parameter', False)
                     load_time = "~90 seconds" if high_param else "~40-50 seconds"
                     # Log to terminal instead of showing in UI
-                    logging.info(f"⏳ Loading AI model for the first time ({load_time})...")
+                    logging.info(f" Loading AI model for the first time ({load_time})...")
                     st.session_state.model = load_model(_high_parameter=high_param)
                     if st.session_state.model:
                         st.session_state.chatbot.model = st.session_state.model
-                    logging.info("✅ Model loaded successfully!")
+                    logging.info(" Model loaded successfully!")
                 
                 if st.session_state.chatbot:
                     try:
-                        logging.info(f"🤖 STREAMLIT: Calling chatbot.chat()")
+                        logging.info(f" STREAMLIT: Calling chatbot.chat()")
                         
                         # Use RAG setting from sidebar (None = auto-detect, True = force on, False = force off)
                         use_rag_setting = settings.get('use_rag', None)
@@ -254,18 +256,16 @@ def chat_page():
                         
                         # Log response details to terminal only
                         logging.info("="*60)
-                        logging.info("✅ STREAMLIT: Got response from chatbot.chat()")
-                        logging.info(f"Response keys: {list(response.keys())}")
+                        logging.info("STREAMLIT: Got response from chatbot.chat()")
                         
-                        # Log each field to terminal
-                        for key, value in response.items():
-                            if key == 'answer':
-                                val_str = str(value)[:5000] if len(str(value)) > 5000 else str(value)
-                                logging.info(f"  answer: {val_str}...")
-                            elif key == 'error':
-                                logging.error(f"  ❌ ERROR: {value}")
-                            else:
-                                logging.info(f"  {key}: {value}")
+                        # Format response for logging
+                        log_response = response.copy()
+                        if 'answer' in log_response and len(str(log_response['answer'])) > 200:
+                            log_response['answer'] = str(log_response['answer'])[:200] + f"... (total {len(str(response['answer']))} chars)"
+                        if 'context' in log_response and len(str(log_response['context'])) > 200:
+                            log_response['context'] = str(log_response['context'])[:200] + "..."
+                        
+                        logging.info(f"Response: {json.dumps(log_response, indent=2, default=str)}")
                         logging.info("="*60)
                         
                         # Get answer
@@ -273,7 +273,7 @@ def chat_page():
                         
                         # Log errors to terminal only (don't show in UI)
                         if 'error' in response:
-                            logging.error(f"❌ Error in response: {response['error']}")
+                            logging.error(f" Error in response: {response['error']}")
                         
                         # Display ONLY the answer - clean UI
                         st.markdown(answer)
@@ -283,7 +283,7 @@ def chat_page():
                         
                         # Log full error details to terminal
                         logging.error("="*60)
-                        logging.error(f"❌ STREAMLIT EXCEPTION: {type(e).__name__}")
+                        logging.error(f" STREAMLIT EXCEPTION: {type(e).__name__}")
                         logging.error(f"Message: {str(e)}")
                         logging.error("Traceback:")
                         logging.error(traceback.format_exc())
@@ -302,7 +302,7 @@ def chat_page():
 
 def document_management_page():
     """Render the document management page."""
-    st.title("📁 Document Management")
+    st.title(" Document Management")
     st.markdown("Upload and manage documents for the chatbot's knowledge base.")
     
     # Two columns: upload and database
@@ -320,7 +320,7 @@ def document_management_page():
             )
             
             if uploaded_files:
-                if st.button("🚀 Process and Add to Knowledge Base", type="primary"):
+                if st.button(" Process and Add to Knowledge Base", type="primary"):
                     with loading_spinner("Processing documents..."):
                         # Save uploaded files temporarily
                         temp_paths = []
@@ -348,9 +348,9 @@ def document_management_page():
                                 with st.expander("📋 Processing Details"):
                                     for file_result in result['results']:
                                         if file_result.get('status') == 'success':
-                                            st.success(f"✅ {file_result['metadata']['file_name']}")
+                                            st.success(f" {file_result['metadata']['file_name']}")
                                         else:
-                                            st.error(f"❌ {file_result.get('file_path')}: {file_result.get('error')}")
+                                            st.error(f" {file_result.get('file_path')}: {file_result.get('error')}")
                             else:
                                 error_message("Chatbot not initialized")
                         
@@ -370,7 +370,7 @@ def document_management_page():
             error_message("Document ingestion system not initialized")
     
     with col2:
-        st.subheader("💾 Vector Database")
+        st.subheader(" Vector Database")
         
         if st.session_state.vector_db:
             # Show database stats
@@ -449,16 +449,16 @@ def main():
     st.sidebar.title("🧭 Navigation")
     page = st.sidebar.radio(
         "Go to:",
-        ["💬 Chat", "📁 Document Management", "🔍 Search & Test"],
+        [" Chat", " Document Management", "🔍 Search & Test"],
         label_visibility="collapsed"
     )
     
     st.sidebar.divider()
     
     # Route to appropriate page
-    if page == "💬 Chat":
+    if page == " Chat":
         chat_page()
-    elif page == "📁 Document Management":
+    elif page == " Document Management":
         document_management_page()
     elif page == "🔍 Search & Test":
         search_page()
@@ -466,7 +466,7 @@ def main():
     # Footer
     st.sidebar.divider()
     st.sidebar.markdown("---")
-    st.sidebar.caption("🤖 Multimodal RAG Chatbot v1.0")
+    st.sidebar.caption(" Multimodal RAG Chatbot v1.0")
     st.sidebar.caption("Powered by DSPy & DNotitia DNA-2.0-8B")
 
 

@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 class ExaoneModel:
     """
-    Wrapper for LGAI-EXAONE models (supports both 7.8B and 1.2B variants).
+    Wrapper for LGAI-EXAONE models (supports both 7.8B and 2.4B variants).
     
     This is the fallback model that doesn't require authentication.
     - High param: EXAONE-3.5-7.8B-Instruct (7.8B parameters, ~15.6GB VRAM)
-    - Low param: EXAONE-4.0-1.2B (1.2B parameters, ~2.4GB VRAM, faster)
+    - Low param: EXAONE-3.5-2.4B-Instruct (2.4B parameters, ~4.8GB VRAM, balanced)
     - Status: Open access, no approval needed
     - Optimized: Instruction-tuned for better responses
     """
@@ -76,12 +76,12 @@ class ExaoneModel:
                 self.device = "mps"
             else:
                 self.device = "cpu"
-                logger.warning("⚠️ Using CPU - this model will be slow without GPU")
+                logger.warning(f"WARNING: Using CPU - this model will be slow without GPU")
         else:
             self.device = device
         
         model_size = "7.8B" if self.high_parameter else "1.2B"
-        logger.info(f"🚀 EXAONE-{model_size} Model | Target device: {self.device}")
+        logger.info(f" EXAONE-{model_size} Model | Target device: {self.device}")
         
         # Initialize model components
         self.tokenizer = None
@@ -99,13 +99,13 @@ class ExaoneModel:
         """
         model_name = self.model_config["name"]
         model_size = "7.8B" if self.high_parameter else "1.2B"
-        logger.info(f"🔄 Loading EXAONE model: {model_name}")
-        logger.info(f"📊 Model size: {model_size} parameters")
-        logger.info("🔓 No authentication required (open access)")
+        logger.info(f" Loading EXAONE model: {model_name}")
+        logger.info(f" Model size: {model_size} parameters")
+        logger.info(f" No authentication required (open access)")
         
         try:
             # Load tokenizer
-            logger.info("📝 Loading tokenizer...")
+            logger.info(f" Loading tokenizer...")
             self.tokenizer = AutoTokenizer.from_pretrained(
                 model_name,
                 trust_remote_code=True
@@ -114,12 +114,12 @@ class ExaoneModel:
             # Set padding token if not set
             if self.tokenizer.pad_token is None:
                 self.tokenizer.pad_token = self.tokenizer.eos_token
-                logger.info("🔧 Set padding token to EOS token")
+                logger.info(f" Set padding token to EOS token")
             
             # Load model with appropriate dtype
-            logger.info("🚀 Loading model weights...")
+            logger.info(f" Loading model weights...")
             dtype = torch.float16 if self.device in ["cuda", "mps"] else torch.float32
-            logger.info(f"📊 Using dtype: {dtype}")
+            logger.info(f" Using dtype: {dtype}")
             
             self.model = AutoModelForCausalLM.from_pretrained(
                 model_name,
@@ -135,11 +135,11 @@ class ExaoneModel:
             
             # Log success
             model_size = "7.8B" if self.high_parameter else "1.2B"
-            logger.info(f"✅ EXAONE-{model_size} loaded successfully!")
-            logger.info(f"   Device: {self.device}")
-            logger.info(f"   Vocab size: {self.tokenizer.vocab_size:,}")
-            logger.info(f"   Model parameters: ~{model_size}")
-            logger.info("   🎯 Instruction-tuned for better responses")
+            logger.info(f" EXAONE-{model_size} loaded successfully!")
+            logger.info(f" Device: {self.device}")
+            logger.info(f" Vocab size: {self.tokenizer.vocab_size:,}")
+            logger.info(f" Model parameters: ~{model_size}")
+            logger.info(f" Instruction-tuned for better responses")
             
         except Exception as e:
             error_str = str(e)
@@ -147,20 +147,20 @@ class ExaoneModel:
             
             # Specific error handling
             if "out of memory" in error_str.lower():
-                error_msg = f"💾 Out of memory loading EXAONE-{model_size}"
-                error_msg += f"\n📊 This model requires ~{self.model_config['min_vram_gb']}GB VRAM"
-                error_msg += f"\n💡 Try using CPU (slower) or close other applications"
+                error_msg = f" Out of memory loading EXAONE-{model_size}"
+                error_msg += f"\n This model requires ~{self.model_config['min_vram_gb']}GB VRAM"
+                error_msg += f"\n Try using CPU (slower) or close other applications"
                 if self.high_parameter:
-                    error_msg += f"\n💡 Or try using high_parameter=False for the smaller 1.2B model"
+                    error_msg += f"\n Or try using high_parameter=False for the smaller 1.2B model"
                 logger.error(error_msg)
                 raise RuntimeError(f"Memory error: {error_str}")
             elif "connection" in error_str.lower() or "timeout" in error_str.lower():
-                error_msg = f"🌐 Network error loading EXAONE-{model_size}"
-                error_msg += "\n💡 Check internet connection or try again later"
+                error_msg = f" Network error loading EXAONE-{model_size}"
+                error_msg += "\n Check internet connection or try again later"
                 logger.error(error_msg)
                 raise RuntimeError(f"Network error: {error_str}")
             else:
-                logger.error(f"❌ Failed to load EXAONE-{model_size}: {error_str}")
+                logger.error(f" Failed to load EXAONE-{model_size}: {error_str}")
                 raise RuntimeError(f"Model loading failed: {error_str}")
     
     def generate(
@@ -190,7 +190,7 @@ class ExaoneModel:
         top_p_val = top_p if top_p is not None else self.top_p
         
         model_size = "7.8B" if self.high_parameter else "1.2B"
-        logger.debug(f"🤖 Generating with EXAONE-{model_size} | temp={temp}, top_p={top_p_val}")
+        logger.debug(f" Generating with EXAONE-{model_size} | temp={temp}, top_p={top_p_val}")
         
         # Format prompt for instruction-tuned model
         formatted_prompt = self._format_instruction_prompt(prompt)
@@ -227,7 +227,7 @@ class ExaoneModel:
         # Clean up instruction formatting artifacts
         generated_text = self._clean_instruction_output(generated_text)
         
-        logger.debug(f"✅ Generated {len(generated_text)} characters")
+        logger.debug(f" Generated {len(generated_text)} characters")
         return generated_text
     
     def _format_instruction_prompt(self, prompt: str) -> str:
