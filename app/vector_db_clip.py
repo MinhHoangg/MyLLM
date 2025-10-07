@@ -309,21 +309,23 @@ class MultimodalVectorDatabase:
     def search(
         self,
         query: Union[str, Image.Image],
-        n_results: int = 5,
+        n_results: int = 100,
         filter_metadata: Optional[Dict[str, str]] = None,
-        content_type: Optional[str] = None
+        content_type: Optional[str] = None,
+        similarity_threshold: float = 0.3
     ) -> Dict[str, Any]:
         """
-        Search for similar documents using text or image query.
+        Search ALL documents and return all relevant results above similarity threshold.
         
         Args:
             query: Search query (text string or PIL Image)
-            n_results: Number of results to return
+            n_results: Maximum number of results to retrieve (searches all)
             filter_metadata: Optional metadata filters
             content_type: Filter by 'text', 'image', or None (all)
+            similarity_threshold: Minimum similarity score (0.0-1.0)
             
         Returns:
-            Dictionary containing search results
+            Dictionary containing all relevant search results
         """
         # Generate query embedding
         if isinstance(query, str):
@@ -340,18 +342,39 @@ class MultimodalVectorDatabase:
         if content_type:
             where_filter['content_type'] = content_type
         
-        # Perform search
+        # Perform comprehensive search with high limit
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=n_results,
+            n_results=n_results,  # High limit to capture all relevant
             where=where_filter if where_filter else None
         )
         
+        # Filter results by similarity threshold
+        filtered_docs = []
+        filtered_metadatas = []
+        filtered_distances = []
+        filtered_ids = []
+        
+        if results['documents'] and results['distances']:
+            for doc, meta, dist, doc_id in zip(
+                results['documents'][0], 
+                results['metadatas'][0], 
+                results['distances'][0], 
+                results['ids'][0]
+            ):
+                # Convert distance to similarity (lower distance = higher similarity)
+                similarity = 1.0 - dist
+                if similarity >= similarity_threshold:
+                    filtered_docs.append(doc)
+                    filtered_metadatas.append(meta)
+                    filtered_distances.append(dist)
+                    filtered_ids.append(doc_id)
+        
         return {
-            'documents': results['documents'][0] if results['documents'] else [],
-            'metadatas': results['metadatas'][0] if results['metadatas'] else [],
-            'distances': results['distances'][0] if results['distances'] else [],
-            'ids': results['ids'][0] if results['ids'] else []
+            'documents': filtered_docs,
+            'metadatas': filtered_metadatas,
+            'distances': filtered_distances,
+            'ids': filtered_ids
         }
     
     def search_multimodal(

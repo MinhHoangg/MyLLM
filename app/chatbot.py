@@ -342,9 +342,9 @@ class MultimodalChatbot:
         """
         import logging
         
-        # Retrieve relevant documents
-        logging.info(f"Searching vector DB for: '{question[:50]}...'")
-        search_results = self.vector_db.search(question, n_results=n_results)
+        # Retrieve ALL relevant documents (search everything)
+        logging.info(f"Searching ALL documents for: '{question[:50]}...'")
+        search_results = self.vector_db.search(question, n_results=n_results)  # High limit to get all relevant
         
         # Log search results
         num_results = len(search_results['documents']) if search_results['documents'] else 0

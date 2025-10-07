@@ -90,8 +90,8 @@ def sidebar_settings_component():
     else:  # "Always Off"
         settings['use_rag'] = False
     
-    # Use intelligent default for retrieved documents
-    settings['n_results'] = 7  # Optimal number for context window
+    # Search ALL documents without artificial limits
+    settings['n_results'] = 100  # High limit to get all relevant results
     
     # Generation settings
     st.sidebar.subheader("Generation Settings")

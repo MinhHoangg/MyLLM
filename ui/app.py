@@ -418,8 +418,8 @@ def search_page():
         key="search_query"
     )
     
-    # Use intelligent default for search results
-    n_results = 8  # Good balance of relevance vs. performance
+    # Search ALL documents and return all relevant results
+    n_results = 100  # High limit to capture all relevant documents
     
     if query:
         if st.button("🔍 Search", type="primary"):
@@ -431,7 +431,7 @@ def search_page():
                     )
                     
                     if results['documents']:
-                        success_message(f"Found {len(results['documents'])} most relevant results")
+                        success_message(f"Found {len(results['documents'])} relevant documents (searched all)")
                         search_results_component(results)
                     else:
                         info_message("No documents found. Try uploading some documents first.")
