@@ -57,13 +57,17 @@ class DNotitiaModel:
         temperature: float = 0.7,
         top_p: float = 0.9,
         hf_token: Optional[str] = None,
-        use_fallback: bool = True
+        use_fallback: bool = True,
+        high_parameter: bool = False  # Default to 1.2B model (faster, lower memory)
     ):
         """
         Initialize the model with automatic fallback support.
         
         This now uses the new ModelManager internally but maintains
         the same external interface for backward compatibility.
+        
+        Args:
+            high_parameter: If True, use EXAONE-3.5-7.8B (7.8B); If False, use EXAONE-4.0-1.2B (1.2B, faster)
         """
         logger.info("🔄 Using new separated model architecture")
         logger.info(f"   Primary: dnotitia_primary_model.py")
@@ -77,6 +81,7 @@ class DNotitiaModel:
         self.top_p = top_p
         self.hf_token = hf_token
         self.use_fallback = use_fallback
+        self.high_parameter = high_parameter
         
         # Determine preference: prefer primary if requesting DNotitia model
         prefer_primary = (model_name == "dnotitia/DNA-2.0-8B")
@@ -85,6 +90,7 @@ class DNotitiaModel:
             # Initialize the model manager
             self.manager = ModelManager(
                 prefer_primary=prefer_primary,
+                high_parameter=high_parameter,
                 hf_token=hf_token,
                 device=device,
                 max_length=max_length,

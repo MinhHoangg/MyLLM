@@ -13,42 +13,57 @@ logger = logging.getLogger(__name__)
 
 class ExaoneModel:
     """
-    Wrapper for LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct model.
+    Wrapper for LGAI-EXAONE models (supports both 7.8B and 1.2B variants).
     
     This is the fallback model that doesn't require authentication.
-    - Model: LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct (7.8B parameters)
-    - Size: ~15.6GB VRAM
+    - High param: EXAONE-3.5-7.8B-Instruct (7.8B parameters, ~15.6GB VRAM)
+    - Low param: EXAONE-4.0-1.2B (1.2B parameters, ~2.4GB VRAM, faster)
     - Status: Open access, no approval needed
     - Optimized: Instruction-tuned for better responses
     """
     
-    MODEL_CONFIG = {
-        "name": "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct",
-        "description": "LG AI EXAONE 3.5 (7.8B parameters) - Fallback model, Instruction-tuned",
-        "requires_approval": False,
-        "size_gb": 15.6,
-        "recommended_device": ["mps", "cuda"],
-        "min_vram_gb": 16,
-        "features": ["instruction_tuned", "open_access", "multilingual"]
+    MODEL_CONFIGS = {
+        "high": {
+            "name": "LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct",
+            "description": "LG AI EXAONE 3.5 (7.8B parameters) - High performance",
+            "requires_approval": False,
+            "size_gb": 15.6,
+            "recommended_device": ["mps", "cuda"],
+            "min_vram_gb": 16,
+            "features": ["instruction_tuned", "open_access", "multilingual", "high_performance"]
+        },
+        "low": {
+            "name": "LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct",
+            "description": "LG AI EXAONE 3.5 (2.4B parameters) - Balanced performance",
+            "requires_approval": False,
+            "size_gb": 4.8,
+            "recommended_device": ["mps", "cuda", "cpu"],
+            "min_vram_gb": 6,
+            "features": ["instruction_tuned", "open_access", "balanced", "efficient"]
+        }
     }
     
     def __init__(
         self,
+        high_parameter: bool = True,
         device: Optional[str] = None,
         max_length: int = 2048,
         temperature: float = 0.7,
         top_p: float = 0.9
     ):
         """
-        Initialize the EXAONE-3.5-7.8B-Instruct model.
+        Initialize the EXAONE model (3.5-7.8B or 4.0-1.2B variant).
         
         Args:
+            high_parameter: If True, use 7.8B model; If False, use 1.2B model (faster, lower memory)
             device: Device to run model on ('cuda', 'mps', 'cpu', or None for auto)
             max_length: Maximum sequence length
             temperature: Sampling temperature
             top_p: Nucleus sampling parameter
         """
-        self.model_name = self.MODEL_CONFIG["name"]
+        self.high_parameter = high_parameter
+        self.model_config = self.MODEL_CONFIGS["high" if high_parameter else "low"]
+        self.model_name = self.model_config["name"]
         self.max_length = max_length
         self.temperature = temperature
         self.top_p = top_p
@@ -65,7 +80,8 @@ class ExaoneModel:
         else:
             self.device = device
         
-        logger.info(f"🚀 EXAONE-3.5-7.8B-Instruct | Target device: {self.device}")
+        model_size = "7.8B" if self.high_parameter else "1.2B"
+        logger.info(f"🚀 EXAONE-{model_size} Model | Target device: {self.device}")
         
         # Initialize model components
         self.tokenizer = None
@@ -76,13 +92,15 @@ class ExaoneModel:
     
     def _load_model(self):
         """
-        Load the EXAONE-3.5-7.8B-Instruct model.
+        Load the EXAONE model (3.5-7.8B or 4.0-1.2B variant).
         
         Raises:
             RuntimeError: If model loading fails
         """
-        model_name = self.MODEL_CONFIG["name"]
+        model_name = self.model_config["name"]
+        model_size = "7.8B" if self.high_parameter else "1.2B"
         logger.info(f"🔄 Loading EXAONE model: {model_name}")
+        logger.info(f"📊 Model size: {model_size} parameters")
         logger.info("🔓 No authentication required (open access)")
         
         try:
@@ -116,52 +134,50 @@ class ExaoneModel:
             self.model.eval()
             
             # Log success
-            logger.info("✅ EXAONE-3.5-7.8B-Instruct loaded successfully!")
+            model_size = "7.8B" if self.high_parameter else "1.2B"
+            logger.info(f"✅ EXAONE-{model_size} loaded successfully!")
             logger.info(f"   Device: {self.device}")
             logger.info(f"   Vocab size: {self.tokenizer.vocab_size:,}")
-            logger.info(f"   Model parameters: ~7.8B")
+            logger.info(f"   Model parameters: ~{model_size}")
             logger.info("   🎯 Instruction-tuned for better responses")
             
         except Exception as e:
             error_str = str(e)
+            model_size = "7.8B" if self.high_parameter else "1.2B"
             
             # Specific error handling
             if "out of memory" in error_str.lower():
-                error_msg = "💾 Out of memory loading EXAONE-3.5-7.8B"
-                error_msg += f"\n📊 This model requires ~{self.MODEL_CONFIG['min_vram_gb']}GB VRAM"
+                error_msg = f"💾 Out of memory loading EXAONE-{model_size}"
+                error_msg += f"\n📊 This model requires ~{self.model_config['min_vram_gb']}GB VRAM"
                 error_msg += f"\n💡 Try using CPU (slower) or close other applications"
+                if self.high_parameter:
+                    error_msg += f"\n💡 Or try using high_parameter=False for the smaller 1.2B model"
                 logger.error(error_msg)
                 raise RuntimeError(f"Memory error: {error_str}")
             elif "connection" in error_str.lower() or "timeout" in error_str.lower():
-                error_msg = "🌐 Network error loading EXAONE-3.5-7.8B"
+                error_msg = f"🌐 Network error loading EXAONE-{model_size}"
                 error_msg += "\n💡 Check internet connection or try again later"
                 logger.error(error_msg)
                 raise RuntimeError(f"Network error: {error_str}")
             else:
-                logger.error(f"❌ Failed to load EXAONE-3.5-7.8B: {error_str}")
+                logger.error(f"❌ Failed to load EXAONE-{model_size}: {error_str}")
                 raise RuntimeError(f"Model loading failed: {error_str}")
     
     def generate(
         self,
         prompt: str,
-        max_new_tokens: int = 512,
+        max_new_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
-        top_p: Optional[float] = None,
-        do_sample: bool = True,
-        num_return_sequences: int = 1
+        top_p: Optional[float] = None
     ) -> str:
         """
-        Generate text from a prompt using EXAONE-3.5-7.8B-Instruct.
-        
-        This model is instruction-tuned, so it works better with structured prompts.
+        Generate text from a prompt using EXAONE model.
         
         Args:
-            prompt: Input text prompt (can be conversational)
-            max_new_tokens: Maximum number of new tokens to generate
-            temperature: Sampling temperature (uses default if None)
-            top_p: Nucleus sampling parameter (uses default if None)
-            do_sample: Whether to use sampling
-            num_return_sequences: Number of sequences to generate
+            prompt: Input prompt text
+            max_new_tokens: Maximum new tokens to generate
+            temperature: Sampling temperature
+            top_p: Nucleus sampling parameter
             
         Returns:
             Generated text
@@ -173,7 +189,8 @@ class ExaoneModel:
         temp = temperature if temperature is not None else self.temperature
         top_p_val = top_p if top_p is not None else self.top_p
         
-        logger.debug(f"🤖 Generating with EXAONE-3.5-7.8B | temp={temp}, top_p={top_p_val}")
+        model_size = "7.8B" if self.high_parameter else "1.2B"
+        logger.debug(f"🤖 Generating with EXAONE-{model_size} | temp={temp}, top_p={top_p_val}")
         
         # Format prompt for instruction-tuned model
         formatted_prompt = self._format_instruction_prompt(prompt)
@@ -191,11 +208,11 @@ class ExaoneModel:
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=max_new_tokens,
+                max_new_tokens=max_new_tokens or 512,
                 temperature=temp,
                 top_p=top_p_val,
-                do_sample=do_sample,
-                num_return_sequences=num_return_sequences,
+                do_sample=True if temp > 0 else False,
+                num_return_sequences=1,
                 pad_token_id=self.tokenizer.pad_token_id,
                 eos_token_id=self.tokenizer.eos_token_id
             )
@@ -263,45 +280,53 @@ class ExaoneModel:
         Returns:
             Dictionary with model information
         """
+        param_size = "7.8B" if self.high_parameter else "1.2B"
         info = {
             'model_name': self.model_name,
             'model_type': 'fallback',
-            'description': self.MODEL_CONFIG['description'],
+            'description': self.model_config['description'],
             'device': self.device,
             'max_length': self.max_length,
             'temperature': self.temperature,
             'top_p': self.top_p,
-            'requires_approval': self.MODEL_CONFIG['requires_approval'],
-            'size_gb': self.MODEL_CONFIG['size_gb'],
+            'requires_approval': self.model_config['requires_approval'],
+            'size_gb': self.model_config['size_gb'],
             'vocab_size': self.tokenizer.vocab_size if self.tokenizer else None,
-            'parameters': '7.8B',
-            'features': self.MODEL_CONFIG['features'],
+            'parameters': param_size,
+            'features': self.model_config['features'],
             'status': 'loaded' if self.model else 'not_loaded',
-            'instruction_tuned': True
+            'instruction_tuned': True,
+            'high_parameter': self.high_parameter
         }
         
         return info
     
     @classmethod
-    def get_model_config(cls) -> Dict[str, Any]:
-        """Get the model configuration."""
-        return cls.MODEL_CONFIG.copy()
+    def get_model_config(cls, high_parameter: bool = True) -> Dict[str, Any]:
+        """Get the model configuration for high or low parameter variant."""
+        config = cls.MODEL_CONFIGS["high" if high_parameter else "low"]
+        return config.copy()
     
     @classmethod
-    def check_requirements(cls) -> Dict[str, Any]:
+    def check_requirements(cls, high_parameter: bool = True) -> Dict[str, Any]:
         """
         Check if system meets requirements for this model.
         
+        Args:
+            high_parameter: True for 7.8B model, False for 1.2B model
+            
         Returns:
             Dictionary with requirement check results
         """
+        config = cls.MODEL_CONFIGS["high" if high_parameter else "low"]
         requirements = {
-            'model_name': cls.MODEL_CONFIG['name'],
-            'size_gb': cls.MODEL_CONFIG['size_gb'],
-            'requires_auth': cls.MODEL_CONFIG['requires_approval'],
+            'model_name': config['name'],
+            'size_gb': config['size_gb'],
+            'requires_auth': config['requires_approval'],
             'gpu_available': torch.cuda.is_available() or torch.backends.mps.is_available(),
-            'recommended_device': cls.MODEL_CONFIG['recommended_device'],
-            'open_access': True
+            'recommended_device': config['recommended_device'],
+            'open_access': True,
+            'high_parameter': high_parameter
         }
         
         # Check available memory (approximate)
@@ -311,7 +336,8 @@ class ExaoneModel:
             requirements['device_type'] = 'cuda'
         else:
             requirements['device_type'] = 'cpu'
-            requirements['warning'] = 'CPU inference will be very slow for 7.8B model'
+            model_size = "7.8B" if high_parameter else "1.2B"
+            requirements['warning'] = f'CPU inference will be slow for {model_size} model'
         
         return requirements
     

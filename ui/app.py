@@ -51,6 +51,7 @@ def init_session_state():
         st.session_state.ingestion = None
         st.session_state.confirm_clear = False
         st.session_state.load_model_on_startup = True  # False = faster startup, loads on first chat
+        st.session_state.high_parameter = False  # False = 1.2B model (default, faster), True = 7.8B model
 
 
 @st.cache_resource
@@ -70,55 +71,16 @@ def load_vector_db():
 
 
 @st.cache_resource(show_spinner=False)
-def load_model():
-    """Load and cache the language model."""
-    import time
-    import logging
+def load_model(_high_parameter: bool = False):
+    """Load the chatbot model with caching
     
-    try:
-        # Create progress bar
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        status_text.text("🔄 Step 1/3: Initializing model configuration...")
-        progress_bar.progress(10)
-        logging.info("="*60)
-        logging.info("STREAMLIT: Starting model load")
-        logging.info("="*60)
-        
-        time.sleep(0.5)
-        status_text.text("🔄 Step 2/3: Loading EXAONE-3.5-7.8B model (~90 seconds)...")
-        progress_bar.progress(20)
-        
-        start_time = time.time()
-        model = DNotitiaModel(
-            model_name="dnotitia/DNA-2.0-8B",  # Will fallback to EXAONE
-            max_length=2048,
-            temperature=0.7
-        )
-        load_time = time.time() - start_time
-        
-        progress_bar.progress(90)
-        status_text.text("🔄 Step 3/3: Finalizing model setup...")
-        time.sleep(0.3)
-        
-        logging.info("="*60)
-        logging.info(f"STREAMLIT: Model loaded in {load_time:.1f}s")
-        logging.info(f"Model name: {model.model_name}")
-        logging.info("="*60)
-        
-        progress_bar.progress(100)
-        status_text.empty()
-        progress_bar.empty()
-        
-        st.success(f"✅ Model loaded: {model.model_name.split('/')[-1]} ({load_time:.1f}s)")
+    Args:
+        _high_parameter: If True, use 7.8B model. If False, use 2.4B model.
+                        Underscore prefix makes it part of the cache key.
+    """
+    with st.spinner("Loading model... This may take a few minutes on first run."):
+        model = DNotitiaModel(high_parameter=_high_parameter)
         return model
-        
-    except Exception as e:
-        st.error(f"❌ Error loading model: {str(e)}")
-        logging.error(f"Model load error: {e}")
-        st.warning("⚠️ The chatbot will work in retrieval-only mode without generation.")
-        return None
 
 
 def initialize_app():
@@ -130,8 +92,10 @@ def initialize_app():
             
             # Load model (slow - optional based on setting)
             if st.session_state.load_model_on_startup:
-                st.info("⏳ Loading AI model (7.8B parameters)... This takes ~90 seconds on first load.")
-                st.session_state.model = load_model()
+                high_param = st.session_state.get('high_parameter', False)
+                param_size = "7.8B, ~90s" if high_param else "2.4B, ~40-50s"
+                st.info(f"⏳ Loading AI model ({param_size})...")
+                st.session_state.model = load_model(_high_parameter=high_param)
             else:
                 st.info("⚡ Skipped model loading for faster startup. Model will load on first chat message.")
                 st.session_state.model = None
@@ -165,6 +129,43 @@ def chat_page():
     # Sidebar info
     with st.sidebar:
         st.divider()
+        
+        # Model configuration section
+        st.subheader("⚙️ Model Configuration")
+        
+        # High parameter toggle
+        current_high_param = st.session_state.get('high_parameter', False)
+        new_high_param = st.checkbox(
+            "Use High-Performance Model (7.8B)",
+            value=current_high_param,
+            help="✅ True: EXAONE-3.5-7.8B (7.8B params, high quality, ~15.6GB VRAM, ~2-3 min load)\n"
+                 "❌ False: EXAONE-3.5-2.4B (2.4B params, balanced, ~4.8GB VRAM, ~40-50s load)",
+            key="high_param_checkbox"
+        )
+        
+        # Show current model size
+        model_size_text = "7.8B (High Performance)" if new_high_param else "2.4B (Balanced)"
+        st.caption(f"📊 Selected: {model_size_text}")
+        
+        # Detect if setting changed - show reload button
+        if new_high_param != current_high_param:
+            st.warning("⚠️ Model setting changed. Click button below to reload.")
+            if st.button("🔄 Reload Model Now", type="primary", use_container_width=True):
+                with st.spinner("Reloading model... Please wait."):
+                    # Clear the cache
+                    load_model.clear()
+                    # Update session state
+                    st.session_state.high_parameter = new_high_param
+                    # Reload model with new setting
+                    new_model = load_model(_high_parameter=new_high_param)
+                    st.session_state.model = new_model
+                    # Update chatbot's model reference
+                    if st.session_state.chatbot:
+                        st.session_state.chatbot.model = new_model
+                    st.success(f"✅ Model reloaded! Now using {'7.8B' if new_high_param else '2.4B'} variant.")
+                    st.rerun()
+        
+        st.divider()
         st.subheader("📊 System Info")
         if st.session_state.model:
             try:
@@ -189,6 +190,15 @@ def chat_page():
                 
                 st.text(f"Model: {display_name}")
                 st.text(f"Device: {model_info.get('device', 'Unknown')}")
+                
+                # Show model parameters
+                if 'parameters' in model_info:
+                    st.text(f"Size: {model_info['parameters']}")
+                
+                # Show high_parameter status
+                if 'high_parameter' in model_info:
+                    high_param_status = "High (7.8B)" if model_info['high_parameter'] else "Low (1.2B)"
+                    st.text(f"Variant: {high_param_status}")
                 
                 # Show if using fallback
                 if model_info.get('is_fallback', False):
@@ -234,7 +244,9 @@ def chat_page():
             with loading_spinner("Thinking..."):
                 # Lazy load model if not loaded yet
                 if st.session_state.model is None and st.session_state.chatbot:
-                    st.info("⏳ Loading AI model for the first time (~90 seconds)...")
+                    high_param = st.session_state.get('high_parameter', False)
+                    load_time = "~90 seconds" if high_param else "~20-30 seconds"
+                    st.info(f"⏳ Loading AI model for the first time ({load_time})...")
                     st.session_state.model = load_model()
                     if st.session_state.model:
                         st.session_state.chatbot.model = st.session_state.model

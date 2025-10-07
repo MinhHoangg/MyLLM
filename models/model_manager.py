@@ -28,6 +28,7 @@ class ModelManager:
     def __init__(
         self,
         prefer_primary: bool = True,
+        high_parameter: bool = False,
         hf_token: Optional[str] = None,
         device: Optional[str] = None,
         max_length: int = 2048,
@@ -39,6 +40,7 @@ class ModelManager:
         
         Args:
             prefer_primary: If True, try primary model first
+            high_parameter: If True, use EXAONE-3.5-7.8B (7.8B params); If False, use EXAONE-4.0-1.2B (1.2B params, faster)
             hf_token: Hugging Face token for primary model
             device: Device preference ('cuda', 'mps', 'cpu', or None)
             max_length: Maximum sequence length
@@ -46,6 +48,7 @@ class ModelManager:
             top_p: Nucleus sampling parameter
         """
         self.prefer_primary = prefer_primary
+        self.high_parameter = high_parameter
         self.hf_token = hf_token
         self.device = device
         self.max_length = max_length
@@ -108,8 +111,10 @@ class ModelManager:
         
         # Try fallback model
         try:
-            logger.info("📍 Step 2: Attempting to load fallback model (EXAONE-3.5-7.8B)")
+            model_size = "EXAONE-3.5-7.8B" if self.high_parameter else "EXAONE-4.0-1.2B"
+            logger.info(f"📍 Step 2: Attempting to load fallback model ({model_size})")
             self.fallback_model = ExaoneModel(
+                high_parameter=self.high_parameter,
                 device=self.device,
                 max_length=self.max_length,
                 temperature=self.temperature,
@@ -129,8 +134,10 @@ class ModelManager:
         
         # Try fallback model
         try:
-            logger.info("📍 Step 1: Attempting to load fallback model (EXAONE-3.5-7.8B)")
+            model_size = "EXAONE-3.5-7.8B" if self.high_parameter else "EXAONE-4.0-1.2B"
+            logger.info(f"📍 Step 1: Attempting to load fallback model ({model_size})")
             self.fallback_model = ExaoneModel(
+                high_parameter=self.high_parameter,
                 device=self.device,
                 max_length=self.max_length,
                 temperature=self.temperature,
