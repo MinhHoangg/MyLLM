@@ -6,6 +6,7 @@ Uses LangChain for document chunking.
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import shutil
+import re
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from PIL import Image
@@ -21,19 +22,26 @@ class DocumentIngestion:
     def __init__(
         self,
         upload_dir: str = "data/uploads",
-        chunk_size: int = 1000,
-        chunk_overlap: int = 200
+        adaptive_chunking: bool = True,
+        base_chunk_size: int = 512,  # Base size, will adapt
+        model_context_window: int = 4096  # Model's context window
     ):
         """
-        Initialize DocumentIngestion.
+        Initialize DocumentIngestion with adaptive chunking.
         
         Args:
             upload_dir: Directory to store uploaded files
-            chunk_size: Size of text chunks for splitting
-            chunk_overlap: Overlap between consecutive chunks
+            adaptive_chunking: Enable intelligent adaptive chunking
+            base_chunk_size: Base chunk size (adapts based on content)
+            model_context_window: Model's maximum context size
         """
         self.upload_dir = Path(upload_dir)
         self.upload_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Adaptive chunking parameters
+        self.adaptive_chunking = adaptive_chunking
+        self.base_chunk_size = base_chunk_size
+        self.model_context_window = model_context_window
         
         # Initialize handlers
         self.handlers = {
@@ -44,13 +52,8 @@ class DocumentIngestion:
             'txt': TXTHandler()
         }
         
-        # Initialize LangChain text splitter
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            length_function=len,
-            separators=["\n\n", "\n", ". ", " ", ""]
-        )
+        # Will be initialized dynamically based on content
+        self.text_splitter = None
     
     def process_file(self, file_path: str, save_copy: bool = True) -> Dict[str, Any]:
         """
@@ -87,19 +90,33 @@ class DocumentIngestion:
     
     def chunk_documents(self, extracted_data: Dict[str, Any]) -> List[Document]:
         """
-        Chunk text content using LangChain's text splitter.
+        Intelligently chunk text content using adaptive strategies.
         
         Args:
             extracted_data: Data extracted from file handlers
             
         Returns:
-            List of LangChain Document objects with chunked text
+            List of LangChain Document objects with optimally chunked text
         """
         documents = []
         
-        # Process text content
+        # Process text content with adaptive chunking
         text_contents = extracted_data.get('text_content', [])
+        
+        if not text_contents:
+            return documents
+        
+        # Analyze content to determine optimal chunking strategy
+        content_analysis = self._analyze_content(text_contents)
+        
+        # Create adaptive text splitter based on content
+        splitter = self._create_adaptive_splitter(content_analysis)
         metadata_base = extracted_data.get('metadata', {})
+        
+        # Log chunking strategy
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Content analysis: {content_analysis['type']}, {content_analysis['total_chars']} chars")
         
         for idx, content_item in enumerate(text_contents):
             text = content_item.get('text', '')
@@ -110,7 +127,8 @@ class DocumentIngestion:
             metadata = metadata_base.copy()
             metadata.update({
                 'content_type': 'text',
-                'section_index': idx
+                'section_index': idx,
+                'chunking_strategy': content_analysis['type']
             })
             
             # Add any additional metadata from content_item
@@ -118,14 +136,26 @@ class DocumentIngestion:
                 if key in content_item:
                     metadata[key] = content_item[key]
             
-            # Split text into chunks
-            chunks = self.text_splitter.split_text(text)
+            # Split text into chunks using adaptive splitter
+            chunks = splitter.split_text(text)
+            logger.info(f"Section {idx+1}: {len(text)} chars → {len(chunks)} chunks")
             
             # Create Document objects for each chunk
             for chunk_idx, chunk in enumerate(chunks):
                 chunk_metadata = metadata.copy()
-                chunk_metadata['chunk_index'] = chunk_idx
-                chunk_metadata['total_chunks'] = len(chunks)
+                chunk_metadata.update({
+                    'chunk_index': chunk_idx,
+                    'total_chunks': len(chunks),
+                    'chunk_size': len(chunk),
+                    'word_count': len(chunk.split())
+                })
+                
+                # Create Document object
+                doc = Document(
+                    page_content=chunk.strip(),
+                    metadata=chunk_metadata
+                )
+                documents.append(doc)
                 
                 documents.append(Document(
                     page_content=chunk,
@@ -133,6 +163,129 @@ class DocumentIngestion:
                 ))
         
         return documents
+    
+    def _analyze_content(self, text_contents: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Analyze content characteristics to determine optimal chunking strategy.
+        
+        Returns:
+            Dictionary with content analysis results
+        """
+        total_chars = 0
+        total_lines = 0
+        has_structure = False
+        avg_sentence_length = 0
+        content_type = 'generic'
+        
+        all_text = ""
+        for content in text_contents:
+            text = content.get('text', '')
+            all_text += text + "\n"
+            total_chars += len(text)
+            total_lines += text.count('\n')
+        
+        if total_chars == 0:
+            return {'type': 'empty', 'chunk_size': self.base_chunk_size, 'overlap': 50}
+        
+        # Detect content structure
+        has_headers = bool(re.search(r'^#{1,6}\s', all_text, re.MULTILINE))  # Markdown headers
+        has_bullets = bool(re.search(r'^[\s]*[-*+]\s', all_text, re.MULTILINE))  # Bullet points
+        has_numbers = bool(re.search(r'^[\s]*\d+\.\s', all_text, re.MULTILINE))  # Numbered lists
+        has_paragraphs = all_text.count('\n\n') > 2
+        
+        has_structure = has_headers or has_bullets or has_numbers or has_paragraphs
+        
+        # Calculate average sentence length
+        sentences = re.split(r'[.!?]+', all_text)
+        if sentences:
+            avg_sentence_length = sum(len(s.strip()) for s in sentences if s.strip()) / len([s for s in sentences if s.strip()])
+        
+        # Determine content type
+        if has_headers and has_bullets:
+            content_type = 'structured_document'
+        elif total_lines / max(1, total_chars / 80) > 0.5:  # Many short lines
+            content_type = 'list_data'
+        elif avg_sentence_length > 100:
+            content_type = 'dense_text'
+        elif avg_sentence_length < 30:
+            content_type = 'sparse_text'
+        else:
+            content_type = 'narrative_text'
+        
+        return {
+            'type': content_type,
+            'total_chars': total_chars,
+            'total_lines': total_lines,
+            'has_structure': has_structure,
+            'avg_sentence_length': avg_sentence_length,
+            'paragraph_count': all_text.count('\n\n')
+        }
+    
+    def _create_adaptive_splitter(self, analysis: Dict[str, Any]) -> RecursiveCharacterTextSplitter:
+        """
+        Create an adaptive text splitter based on content analysis.
+        
+        Args:
+            analysis: Content analysis results
+            
+        Returns:
+            Configured RecursiveCharacterTextSplitter
+        """
+        content_type = analysis['type']
+        total_chars = analysis['total_chars']
+        has_structure = analysis['has_structure']
+        avg_sentence_length = analysis['avg_sentence_length']
+        
+        # Adaptive chunk size calculation
+        if content_type == 'structured_document':
+            # Preserve structure, larger chunks
+            chunk_size = min(800, max(400, int(avg_sentence_length * 6)))
+            overlap = max(50, int(chunk_size * 0.15))
+            separators = ["\n\n\n", "\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""]
+            
+        elif content_type == 'list_data':
+            # Smaller chunks, preserve list items
+            chunk_size = min(400, max(200, int(total_chars / 50)))
+            overlap = max(20, int(chunk_size * 0.1))
+            separators = ["\n\n", "\n", "; ", ", ", " ", ""]
+            
+        elif content_type == 'dense_text':
+            # Larger chunks for dense content
+            chunk_size = min(1200, max(600, int(avg_sentence_length * 8)))
+            overlap = max(100, int(chunk_size * 0.2))
+            separators = ["\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""]
+            
+        elif content_type == 'sparse_text':
+            # Smaller chunks for sparse content
+            chunk_size = min(300, max(150, int(avg_sentence_length * 4)))
+            overlap = max(30, int(chunk_size * 0.15))
+            separators = ["\n\n", "\n", ". ", " ", ""]
+            
+        else:  # narrative_text or generic
+            # Balanced approach
+            chunk_size = self.base_chunk_size
+            overlap = max(50, int(chunk_size * 0.15))
+            separators = ["\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""]
+        
+        # Ensure chunk size fits within model context window
+        max_chunk_size = min(self.model_context_window // 4, 1500)  # Leave room for prompt
+        chunk_size = min(chunk_size, max_chunk_size)
+        
+        # Ensure minimum viable chunk size
+        chunk_size = max(chunk_size, 100)
+        overlap = min(overlap, chunk_size // 3)  # Overlap shouldn't exceed 1/3 of chunk
+        
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Adaptive chunking: type={content_type}, size={chunk_size}, overlap={overlap}")
+        
+        return RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size,
+            chunk_overlap=overlap,
+            length_function=len,
+            separators=separators,
+            keep_separator=True  # Preserve separators for context
+        )
     
     def process_images(self, extracted_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
