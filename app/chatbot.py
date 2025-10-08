@@ -237,7 +237,8 @@ class MultimodalChatbot:
         question: str,
         use_rag: bool = None,  # None = auto-detect
         n_results: int = 5,
-        include_history: bool = True
+        include_history: bool = True,
+        similarity_threshold: float = 0.3
     ) -> Dict[str, Any]:
         """
         Process a chat message and generate a response.
@@ -247,6 +248,7 @@ class MultimodalChatbot:
             use_rag: Whether to use RAG. If None, auto-detects based on question
             n_results: Number of documents to retrieve
             include_history: Whether to include conversation history
+            similarity_threshold: Minimum similarity score for retrieval (default: 0.3)
             
         Returns:
             Dictionary containing answer and metadata
@@ -277,7 +279,8 @@ class MultimodalChatbot:
             'answer': '',
             'context': '',
             'sources': [],
-            'method': 'rag' if use_rag else 'direct'
+            'method': 'rag' if use_rag else 'direct',
+            'used_rag': use_rag if use_rag is not None else False
         }
         
         try:
@@ -293,7 +296,7 @@ class MultimodalChatbot:
                 logging.info(" Using RAG pipeline...")
                 # ALWAYS use manual RAG (DSPy RAG is too slow and has threading issues)
                 logging.info(" Using manual RAG (faster and more stable)...")
-                response = self._manual_rag(question, n_results)
+                response = self._manual_rag(question, n_results, similarity_threshold)
             else:
                 logging.info(" Direct generation (no RAG)...")
                 # Direct generation without RAG
@@ -329,13 +332,14 @@ class MultimodalChatbot:
         
         return response
     
-    def _manual_rag(self, question: str, n_results: int = 5) -> Dict[str, Any]:
+    def _manual_rag(self, question: str, n_results: int = 5, similarity_threshold: float = 0.3) -> Dict[str, Any]:
         """
         Manual RAG implementation without DSPy.
         
         Args:
             question: User's question
             n_results: Number of documents to retrieve
+            similarity_threshold: Minimum similarity score for retrieval
             
         Returns:
             Response dictionary
@@ -344,7 +348,7 @@ class MultimodalChatbot:
         
         # Retrieve ALL relevant documents (search everything)
         logging.info(f"Searching ALL documents for: '{question[:50]}...'")
-        search_results = self.vector_db.search(question, n_results=n_results)  # High limit to get all relevant
+        search_results = self.vector_db.search(question, n_results=n_results, similarity_threshold=similarity_threshold)
         
         # Log search results
         num_results = len(search_results['documents']) if search_results['documents'] else 0
@@ -358,7 +362,8 @@ class MultimodalChatbot:
                 'answer': "I couldn't find any relevant information in the knowledge base. Please make sure documents or images have been uploaded.",
                 'context': '',
                 'sources': [],
-                'method': 'rag'
+                'method': 'rag',
+                'used_rag': True
             }
         
         # Format context
@@ -403,7 +408,8 @@ Provide a direct answer without repeating the question or including labels:"""
             'answer': answer,
             'context': context,
             'sources': search_results['metadatas'],
-            'method': 'rag'
+            'method': 'rag',
+            'used_rag': True
         }
     
     def _clean_answer(self, answer: str) -> str:

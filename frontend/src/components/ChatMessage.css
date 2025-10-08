@@ -1,0 +1,143 @@
+.message {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+  animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.message-user .message-icon {
+  background-color: #1976d2;
+  color: white;
+}
+
+.message-assistant .message-icon {
+  background-color: #4caf50;
+  color: white;
+}
+
+.message-content {
+  flex: 1;
+  max-width: 70%;
+}
+
+.message-user .message-content {
+  background-color: #e3f2fd;
+  border-radius: 12px 12px 4px 12px;
+  padding: 12px 16px;
+}
+
+.message-assistant .message-content {
+  background-color: #f5f5f5;
+  border-radius: 12px 12px 12px 4px;
+  padding: 12px 16px;
+}
+
+.message-text {
+  color: #333;
+  line-height: 1.6;
+}
+
+.message-text p {
+  margin: 0 0 12px 0;
+}
+
+.message-text p:last-child {
+  margin-bottom: 0;
+}
+
+.message-text code {
+  background-color: rgba(0, 0, 0, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.message-text pre {
+  background-color: #2d2d2d;
+  color: #f8f8f2;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.message-text pre code {
+  background-color: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.message-sources {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.sources-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  color: #666;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.source-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.03);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.source-name {
+  color: #555;
+}
+
+.source-similarity {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.message-metadata {
+  margin-top: 8px;
+  display: flex;
+  gap: 16px;
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.metadata-item strong {
+  color: #666;
+}

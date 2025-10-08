@@ -1,294 +1,585 @@
-# Multimodal RAG Chatbot with DSPy
+# Multimodal RAG Chatbot# Multimodal RAG Chatbot with DSPy
 
-A sophisticated multimodal chatbot built with **DSPy**, powered by **Hugging Face language models** (dnotitia/DNA-2.0-1.7B with automatic fallback to upstage/SOLAR-10.7B-v1.0), featuring a complete **Retrieval-Augmented Generation (RAG)** pipeline that supports both text and image content.
 
-## 🎯 Project Overview
 
-This project implements a production-ready multimodal chatbot that can:
-- Process multiple file formats (PDF, DOCX, XLSX, TXT, images, etc.)
-- Extract and process both text and images from documents
-- Store content in a vector database for efficient retrieval
+Production-ready multimodal chatbot with document understanding, powered by **EXAONE-3.5**, **CLIP embeddings**, and **RAG** (Retrieval-Augmented Generation).A sophisticated multimodal chatbot built with **DSPy**, powered by **Hugging Face language models** (dnotitia/DNA-2.0-1.7B with automatic fallback to upstage/SOLAR-10.7B-v1.0), featuring a complete **Retrieval-Augmented Generation (RAG)** pipeline that supports both text and image content.
+
+
+
+## 🚀 Quick Start## 🎯 Project Overview
+
+
+
+Choose your operating system:This project implements a production-ready multimodal chatbot that can:
+
+- **macOS**: See [SETUP_MACOS.md](SETUP_MACOS.md)- Process multiple file formats (PDF, DOCX, XLSX, TXT, images, etc.)
+
+- **Windows**: See [SETUP_WINDOWS.md](SETUP_WINDOWS.md)- Extract and process both text and images from documents
+
+- **Linux**: See [SETUP_LINUX.md](SETUP_LINUX.md)- Store content in a vector database for efficient retrieval
+
 - Answer questions using RAG with DSPy orchestration
-- Provide an intuitive Streamlit-based user interface
+
+## 🏗️ Architecture- Provide an intuitive Streamlit-based user interface
+
 - **Automatic model fallback**: Works immediately with SOLAR-10.7B if primary model pending approval
 
-### Key Features
+**Backend:** FastAPI + Python (Port 8000)
 
-✅ **Multimodal Document Processing**: Handles text and images from various file formats  
-✅ **Advanced RAG Pipeline**: Uses DSPy for structured retrieval and generation  
-✅ **CLIP Integration**: True multimodal understanding with text-image embeddings ⭐ NEW  
+- REST API for chat, documents, search### Key Features
+
+- WebSocket support for streaming
+
+- Offline-first model loading✅ **Multimodal Document Processing**: Handles text and images from various file formats  
+
+- Adaptive content-aware chunking✅ **Advanced RAG Pipeline**: Uses DSPy for structured retrieval and generation  
+
+- CLIP multimodal embeddings✅ **CLIP Integration**: True multimodal understanding with text-image embeddings ⭐ NEW  
+
 ✅ **Vector Database**: ChromaDB for efficient semantic search  
-✅ **LangChain Integration**: Intelligent document chunking  
-✅ **Modern UI**: Interactive Streamlit interface with chat and management features  
-✅ **Production-Ready**: Modular architecture with proper error handling
 
----
+**Frontend:** React + Vite (Port 3000)✅ **LangChain Integration**: Intelligent document chunking  
+
+- Modern React with hooks✅ **Modern UI**: Interactive Streamlit interface with chat and management features  
+
+- Drag-and-drop file upload✅ **Production-Ready**: Modular architecture with proper error handling
+
+- Real-time chat interface
+
+- Document management---
+
+- Search functionality
 
 ## 🏗️ Architecture
 
+## ✨ Features
+
 ### System Components
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Streamlit UI Layer                       │
-│  (Chat Interface | Document Management | Search & Test)     │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│                  Application Layer                           │
+- ✅ **Unlimited responses** - 4096 tokens (~3000 words)
+
+- ✅ **RAG auto-detection** - Automatically uses documents when needed```
+
+- ✅ **Multimodal** - Text + image understanding with CLIP┌─────────────────────────────────────────────────────────────┐
+
+- ✅ **Adaptive chunking** - 5 content-aware strategies│                     Streamlit UI Layer                       │
+
+- ✅ **Offline-first** - Models load from cache after first download│  (Chat Interface | Document Management | Search & Test)     │
+
+- ✅ **Unlimited search** - All documents with similarity threshold└──────────────────────┬──────────────────────────────────────┘
+
+- ✅ **Professional logging** - JSON-formatted                       │
+
+- ✅ **Conversation history** - Multi-turn context-aware chat┌──────────────────────▼──────────────────────────────────────┐
+
+- ✅ **Model switching** - 2.4B (fast) ↔ 7.8B (high-performance)│                  Application Layer                           │
+
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Chatbot    │  │  Ingestion   │  │  Vector DB   │      │
+
+## 🤖 Models│  │   Chatbot    │  │  Ingestion   │  │  Vector DB   │      │
+
 │  │   (DSPy)     │  │  (LangChain) │  │  (ChromaDB)  │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│                  File Handlers Layer                         │
+
+| Model | Size | Load Time | Use Case |│  └──────────────┘  └──────────────┘  └──────────────┘      │
+
+|-------|------|-----------|----------|└──────────────────────┬──────────────────────────────────────┘
+
+| EXAONE-3.5-2.4B | ~4.8GB | 40-50s | Default, fast responses |                       │
+
+| EXAONE-3.5-7.8B | ~15.6GB | 2-3min | High-performance mode |┌──────────────────────▼──────────────────────────────────────┐
+
+| CLIP ViT-B/32 | ~600MB | <10s | Multimodal embeddings |│                  File Handlers Layer                         │
+
 │  [PDF] [Images] [DOCX] [XLSX] [TXT/LOG]                    │
-└──────────────────────┬──────────────────────────────────────┘
+
+## 📁 Project Structure└──────────────────────┬──────────────────────────────────────┘
+
                        │
-┌──────────────────────▼──────────────────────────────────────┐
-│                    Model Layer                               │
-│            DNotitia DNA-2.0-1.7B (Hugging Face)            │
-└─────────────────────────────────────────────────────────────┘
-```
 
-### Data Flow
+```┌──────────────────────▼──────────────────────────────────────┐
 
-1. **Document Upload** → File Handlers extract content (text + images)
-2. **Chunking** → LangChain splits text into semantic chunks
-3. **Embedding** → Sentence-Transformers generate vector embeddings
-4. **Storage** → ChromaDB stores embeddings with metadata
-5. **Query** → User asks a question
-6. **Retrieval** → ChromaDB finds relevant chunks (semantic search)
-7. **Generation** → DSPy orchestrates LLM to generate answer with context
-8. **Response** → Answer displayed with sources
+ChatBot/│                    Model Layer                               │
 
----
+├── backend/               # FastAPI application│            DNotitia DNA-2.0-1.7B (Hugging Face)            │
 
-## 📁 Project Structure
+│   ├── main.py           # App entry point└─────────────────────────────────────────────────────────────┘
 
-```
-ChatBot/
-├── app/
-│   ├── __init__.py
-│   ├── chatbot.py              # DSPy RAG pipeline & chatbot logic
-│   ├── ingestion.py            # Document processing & chunking
-│   ├── vector_db.py            # ChromaDB operations
-│   ├── file_handlers/
-│   │   ├── __init__.py
-│   │   ├── pdf_handler.py      # PDF extraction (PyMuPDF)
+│   ├── schemas.py        # Pydantic models```
+
+│   ├── routes/           # API endpoints
+
+│   │   ├── chat.py       # Chat endpoints### Data Flow
+
+│   │   ├── documents.py  # Document management
+
+│   │   ├── search.py     # Search endpoint1. **Document Upload** → File Handlers extract content (text + images)
+
+│   │   └── model.py      # Model configuration2. **Chunking** → LangChain splits text into semantic chunks
+
+│   └── requirements.txt3. **Embedding** → Sentence-Transformers generate vector embeddings
+
+├── frontend/             # React application4. **Storage** → ChromaDB stores embeddings with metadata
+
+│   ├── src/5. **Query** → User asks a question
+
+│   │   ├── components/   # UI components6. **Retrieval** → ChromaDB finds relevant chunks (semantic search)
+
+│   │   ├── pages/        # Page components7. **Generation** → DSPy orchestrates LLM to generate answer with context
+
+│   │   ├── hooks/        # Custom hooks8. **Response** → Answer displayed with sources
+
+│   │   ├── services/     # API client
+
+│   │   └── context/      # Global state---
+
+│   ├── package.json
+
+│   └── vite.config.js## 📁 Project Structure
+
+├── app/                  # Core business logic
+
+│   ├── chatbot.py        # Chatbot with RAG```
+
+│   ├── vector_db_clip.py # Vector databaseChatBot/
+
+│   └── ingestion.py      # Document processing├── app/
+
+├── models/               # Model wrappers│   ├── __init__.py
+
+│   ├── dnotitia_model.py│   ├── chatbot.py              # DSPy RAG pipeline & chatbot logic
+
+│   ├── clip_embedder.py│   ├── ingestion.py            # Document processing & chunking
+
+│   └── exaone_fallback_model.py│   ├── vector_db.py            # ChromaDB operations
+
+└── data/│   ├── file_handlers/
+
+    └── embeddings_db/    # ChromaDB storage│   │   ├── __init__.py
+
+```│   │   ├── pdf_handler.py      # PDF extraction (PyMuPDF)
+
 │   │   ├── image_handler.py    # Image processing with OCR
-│   │   ├── doc_handler.py      # DOCX processing
+
+## 🔌 API Endpoints│   │   ├── doc_handler.py      # DOCX processing
+
 │   │   ├── xlsx_handler.py     # Excel spreadsheet processing
-│   │   └── txt_handler.py      # Text files (TXT, LOG, etc.)
-│   └── utils.py                # Utility functions
-│
-├── models/
+
+### Chat│   │   └── txt_handler.py      # Text files (TXT, LOG, etc.)
+
+- `POST /api/chat/` - Send message│   └── utils.py                # Utility functions
+
+- `POST /api/chat/clear-history` - Clear history│
+
+- `WebSocket /api/chat/ws` - Streaming chat├── models/
+
 │   ├── __init__.py
-│   └── dnotitia_model.py       # Hugging Face model wrapper
+
+### Documents│   └── dnotitia_model.py       # Hugging Face model wrapper
+
+- `POST /api/documents/upload` - Upload files│
+
+- `GET /api/documents/` - List documents├── ui/
+
+- `DELETE /api/documents/{id}` - Delete document│   ├── __init__.py
+
+- `DELETE /api/documents/` - Clear all│   ├── app.py                  # Main Streamlit application
+
+- `GET /api/documents/stats` - Statistics│   └── components.py           # Reusable UI components
+
 │
-├── ui/
-│   ├── __init__.py
-│   ├── app.py                  # Main Streamlit application
-│   └── components.py           # Reusable UI components
-│
-├── data/
-│   ├── uploads/                # Uploaded files
+
+### Search├── data/
+
+- `POST /api/search/` - Search documents│   ├── uploads/                # Uploaded files
+
 │   ├── chunks/                 # Processed chunks
-│   └── embeddings_db/          # ChromaDB persistence
+
+### Model│   └── embeddings_db/          # ChromaDB persistence
+
+- `GET /api/model/info` - Model info│
+
+- `POST /api/model/config` - Update settings├── tests/
+
+- `GET /api/model/settings` - Get settings│   └── test_app.py            # Unit tests
+
 │
-├── tests/
-│   └── test_app.py            # Unit tests
+
+### Health├── .streamlit/
+
+- `GET /api/health` - Health check│   └── config.toml            # Streamlit configuration
+
 │
-├── .streamlit/
-│   └── config.toml            # Streamlit configuration
-│
-├── requirements.txt            # Python dependencies
+
+**API Documentation:** http://localhost:8000/docs (Swagger UI)├── requirements.txt            # Python dependencies
+
 └── README.md                   # This file
-```
 
----
+## 💡 Usage Examples```
 
-## 🔧 Technical Details
 
-### 1. File Handlers
 
-Each handler is specialized for specific file types:
+### Chat Request---
 
-#### **PDF Handler** (`pdf_handler.py`)
-- Uses **PyMuPDF (fitz)** for robust PDF processing
+```bash
+
+curl -X POST http://localhost:8000/api/chat/ \## 🔧 Technical Details
+
+  -H "Content-Type: application/json" \
+
+  -d '{### 1. File Handlers
+
+    "question": "What is in my documents?",
+
+    "use_rag": null,Each handler is specialized for specific file types:
+
+    "similarity_threshold": 0.3
+
+  }'#### **PDF Handler** (`pdf_handler.py`)
+
+```- Uses **PyMuPDF (fitz)** for robust PDF processing
+
 - Extracts text from each page
-- Extracts embedded images with metadata
-- Handles complex PDF structures
 
-#### **Image Handler** (`image_handler.py`)
-- Supports PNG, JPG, JPEG, BMP, TIFF, GIF
-- **OCR** with pytesseract to extract text from images
-- Image preprocessing (RGBA → RGB conversion)
+### Upload Documents- Extracts embedded images with metadata
+
+```bash- Handles complex PDF structures
+
+curl -X POST http://localhost:8000/api/documents/upload \
+
+  -F "files=@document.pdf" \#### **Image Handler** (`image_handler.py`)
+
+  -F "files=@image.jpg" \- Supports PNG, JPG, JPEG, BMP, TIFF, GIF
+
+  -F "use_adaptive_chunking=true"- **OCR** with pytesseract to extract text from images
+
+```- Image preprocessing (RGBA → RGB conversion)
+
 - Stores PIL Image objects for display
 
-#### **DOC/DOCX Handler** (`doc_handler.py`)
-- Uses **python-docx** library
-- Extracts text from paragraphs
-- Processes tables and preserves structure
-- Extracts document metadata (author, title)
+### Search
 
-#### **XLSX Handler** (`xlsx_handler.py`)
-- Uses **openpyxl** and **pandas**
+```bash#### **DOC/DOCX Handler** (`doc_handler.py`)
+
+curl -X POST http://localhost:8000/api/search/ \- Uses **python-docx** library
+
+  -H "Content-Type: application/json" \- Extracts text from paragraphs
+
+  -d '{- Processes tables and preserves structure
+
+    "query": "machine learning",- Extracts document metadata (author, title)
+
+    "similarity_threshold": 0.3
+
+  }'#### **XLSX Handler** (`xlsx_handler.py`)
+
+```- Uses **openpyxl** and **pandas**
+
 - Processes multiple sheets
-- Converts tabular data to readable text format
-- Handles formulas and calculated values
 
-#### **TXT/LOG Handler** (`txt_handler.py`)
-- Universal text file processor
-- Automatic encoding detection with **chardet**
+### Switch Model- Converts tabular data to readable text format
+
+```bash- Handles formulas and calculated values
+
+curl -X POST http://localhost:8000/api/model/config \
+
+  -H "Content-Type: application/json" \#### **TXT/LOG Handler** (`txt_handler.py`)
+
+  -d '{"high_parameter": true}'  # true=7.8B, false=2.4B- Universal text file processor
+
+```- Automatic encoding detection with **chardet**
+
 - Supports TXT, LOG, MD, CSV, JSON, XML, YAML
-- Handles large files efficiently
 
-### 2. Document Ingestion (`ingestion.py`)
+## ⚙️ Configuration- Handles large files efficiently
 
-The ingestion module orchestrates the entire document processing pipeline:
 
-1. **File Detection**: Automatically selects appropriate handler
+
+### Environment Variables### 2. Document Ingestion (`ingestion.py`)
+
+Create `.env` in frontend directory:
+
+```bashThe ingestion module orchestrates the entire document processing pipeline:
+
+VITE_API_URL=http://localhost:8000
+
+```1. **File Detection**: Automatically selects appropriate handler
+
 2. **Content Extraction**: Extracts text and images
-3. **Chunking**: Uses LangChain's `RecursiveCharacterTextSplitter`
-   - Chunk size: 1000 characters
-   - Overlap: 200 characters
-   - Smart splitting on natural boundaries (paragraphs, sentences)
-4. **Metadata Preservation**: Maintains source information, page numbers, etc.
+
+### Similarity Threshold3. **Chunking**: Uses LangChain's `RecursiveCharacterTextSplitter`
+
+Controls search sensitivity (0.0-1.0):   - Chunk size: 1000 characters
+
+- `0.1-0.2` - Very lenient (more results)   - Overlap: 200 characters
+
+- `0.3` - Default (balanced)   - Smart splitting on natural boundaries (paragraphs, sentences)
+
+- `0.4-0.5` - Strict (fewer, more relevant results)4. **Metadata Preservation**: Maintains source information, page numbers, etc.
+
 5. **Image Processing**: Prepares images for embedding
+
+## 🛠️ Development
 
 ### 3. Vector Database (`vector_db.py`)
 
-**ChromaDB** implementation with:
+### Backend (with hot reload)
 
-- **Persistent Storage**: Data persists across sessions
-- **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2`
+```bash**ChromaDB** implementation with:
+
+cd backend
+
+uvicorn main:app --reload --port 8000- **Persistent Storage**: Data persists across sessions
+
+```- **Embedding Model**: `sentence-transformers/all-MiniLM-L6-v2`
+
 - **Cosine Similarity**: For semantic search
-- **Metadata Filtering**: Search by file, type, page, etc.
-- **CRUD Operations**: Add, search, delete, clear collections
 
-**Key Methods**:
-- `add_text_documents()`: Store text chunks with embeddings
+### Frontend (with HMR)- **Metadata Filtering**: Search by file, type, page, etc.
+
+```bash- **CRUD Operations**: Add, search, delete, clear collections
+
+cd frontend
+
+npm run dev**Key Methods**:
+
+```- `add_text_documents()`: Store text chunks with embeddings
+
 - `add_image_documents()`: Store image metadata with embeddings
-- `search()`: Semantic search with filters
-- `get_all_documents()`: Retrieve all stored documents
-- `clear_collection()`: Reset database
 
-### 3.5. CLIP Multimodal Embeddings ⭐ NEW (`vector_db_clip.py`, `clip_embedder.py`)
+### Build Frontend for Production- `search()`: Semantic search with filters
+
+```bash- `get_all_documents()`: Retrieve all stored documents
+
+cd frontend- `clear_collection()`: Reset database
+
+npm run build
+
+npm run preview  # Preview production build### 3.5. CLIP Multimodal Embeddings ⭐ NEW (`vector_db_clip.py`, `clip_embedder.py`)
+
+```
 
 **Enhanced multimodal understanding** with OpenAI's CLIP:
 
-#### **Why CLIP?**
-Traditional approaches store images as text descriptions. CLIP creates **aligned embeddings** where text and images share the same vector space, enabling:
+## 📊 Performance
 
-- **True Visual Understanding**: Images represented by what they contain, not just descriptions
-- **Cross-Modal Retrieval**: Find images using text, or text using images
-- **Zero-Shot Classification**: Understand new concepts without additional training
+#### **Why CLIP?**
+
+- **Response length:** 4096 tokens max (~3000 words)Traditional approaches store images as text descriptions. CLIP creates **aligned embeddings** where text and images share the same vector space, enabling:
+
+- **Model loading:** 40-50s (2.4B), 2-3min (7.8B), cached after first load
+
+- **Embeddings:** 512-dimensional CLIP vectors- **True Visual Understanding**: Images represented by what they contain, not just descriptions
+
+- **Chunking:** Adaptive (100-1200 chars based on content type)- **Cross-Modal Retrieval**: Find images using text, or text using images
+
+- **Search:** Unlimited results with similarity filtering- **Zero-Shot Classification**: Understand new concepts without additional training
+
 - **Better Semantic Matching**: More accurate alignment between user intent and content
 
-#### **CLIPEmbedder** (`models/clip_embedder.py`)
-```python
-# Encode text and images in the same space
-embedder = CLIPEmbedder(model_name="openai/clip-vit-base-patch32")
+## 🧩 Adaptive Chunking Strategies
 
-text_emb = embedder.encode_text(["a red sunset over ocean"])
-image_emb = embedder.encode_images([image])
-similarity = embedder.compute_similarity(text_emb, image_emb)
-```
+#### **CLIPEmbedder** (`models/clip_embedder.py`)
+
+The system automatically selects the best chunking strategy:```python
+
+# Encode text and images in the same space
+
+| Content Type | Chunk Size | Overlap | Use Case |embedder = CLIPEmbedder(model_name="openai/clip-vit-base-patch32")
+
+|--------------|------------|---------|----------|
+
+| Structured Document | 400-800 | 100 | Headers, sections, bullets |text_emb = embedder.encode_text(["a red sunset over ocean"])
+
+| List Data | 100-400 | 50 | Key-value pairs, lists |image_emb = embedder.encode_images([image])
+
+| Dense Text | 600-1200 | 150 | Technical docs, articles |similarity = embedder.compute_similarity(text_emb, image_emb)
+
+| Sparse Text | 150-300 | 50 | Short entries, logs |```
+
+| Narrative Text | 512 | 128 | Stories, conversations |
 
 **Features**:
-- **Unified Embedding Space**: 512/768-dimensional vectors for both text and images
+
+## 🔧 Technologies- **Unified Embedding Space**: 512/768-dimensional vectors for both text and images
+
 - **Multiple Models**: ViT-B/32 (600MB, fast) or ViT-L/14 (1.7GB, accurate)
-- **Auto Device Detection**: CUDA → MPS → CPU
-- **Batch Processing**: Efficient handling of multiple images
-- **HybridEmbedder**: Combines CLIP + sentence-transformers
 
-#### **MultimodalVectorDatabase** (`app/vector_db_clip.py`)
+- **Backend:** FastAPI, Uvicorn, ChromaDB, Transformers, PyTorch- **Auto Device Detection**: CUDA → MPS → CPU
 
-Enhanced ChromaDB with CLIP support:
+- **Frontend:** React 18, Vite, React Query, React Router, Axios- **Batch Processing**: Efficient handling of multiple images
 
-```python
+- **AI/ML:** EXAONE-3.5, CLIP, Hugging Face Transformers- **HybridEmbedder**: Combines CLIP + sentence-transformers
+
+- **Vector DB:** ChromaDB with CLIP embeddings
+
+- **Language Support:** Python 3.8+, Node.js 18+#### **MultimodalVectorDatabase** (`app/vector_db_clip.py`)
+
+
+
+## 🎯 Key Improvements Over StreamlitEnhanced ChromaDB with CLIP support:
+
+
+
+This is a complete architectural migration from Streamlit to FastAPI + React:```python
+
 db = MultimodalVectorDatabase(use_clip=True)
 
-# Search with text (finds both text and images)
-results = db.search("beautiful sunset")
+1. **Separation of Concerns** - API backend separate from UI frontend
 
-# Search with image (finds similar images and related text)
-results = db.search(query_image, query_type='image')
+2. **Scalability** - RESTful API can serve multiple clients# Search with text (finds both text and images)
 
-# Multimodal fusion search
-results = db.search_multimodal(
-    text_query="sunset over water",
+3. **Maintainability** - Modern React component structureresults = db.search("beautiful sunset")
+
+4. **Developer Experience** - Hot reload for both backend and frontend
+
+5. **Production Ready** - Proper error handling, logging, validation# Search with image (finds similar images and related text)
+
+6. **API Documentation** - Automatic Swagger/OpenAPI docsresults = db.search(query_image, query_type='image')
+
+7. **Type Safety** - Pydantic for backend, PropTypes for frontend
+
+8. **Modern Tooling** - Vite for fast builds, React Query for caching# Multimodal fusion search
+
+9. **WebSocket Ready** - Foundation for streaming responsesresults = db.search_multimodal(
+
+10. **No Docker Complexity** - Direct execution, easier debugging    text_query="sunset over water",
+
     image_query=example_image,
-    alpha=0.5  # Balance text and image importance
-)
-```
 
-**Capabilities**:
-- **Text → Image**: Find images matching text description
+## 🐛 Troubleshooting    alpha=0.5  # Balance text and image importance
+
+)
+
+### Backend won't start```
+
+```bash
+
+# Check Python version (3.8+ required)**Capabilities**:
+
+python --version- **Text → Image**: Find images matching text description
+
 - **Image → Image**: Find visually similar images
-- **Image → Text**: Find text related to image content
-- **Multimodal Fusion**: Combined text + image queries with adjustable weighting
+
+# Reinstall dependencies- **Image → Text**: Find text related to image content
+
+pip install -r requirements.txt- **Multimodal Fusion**: Combined text + image queries with adjustable weighting
+
+pip install -r backend/requirements.txt
 
 > **📘 Learn More**: See [docs/general/CLIP_GUIDE.md](docs/general/CLIP_GUIDE.md) for detailed usage guide  
-> **🔧 Integration**: See [CLIP_INTEGRATION.md](CLIP_INTEGRATION.md) for step-by-step setup
 
-### 4. DSPy RAG Pipeline (`chatbot.py`)
+# Check if port 8000 is available> **🔧 Integration**: See [CLIP_INTEGRATION.md](CLIP_INTEGRATION.md) for step-by-step setup
+
+lsof -i :8000  # macOS/Linux
+
+netstat -ano | findstr :8000  # Windows### 4. DSPy RAG Pipeline (`chatbot.py`)
+
+```
 
 **DSPy** (Declarative Self-improving Language Programs) provides structured LM programming:
 
-#### **RAG Components**:
+### Frontend won't start
 
-```python
+```bash#### **RAG Components**:
+
+# Check Node.js version (18+ required)
+
+node --version```python
+
 class RAGSignature(dspy.Signature):
-    context = dspy.InputField(desc="Retrieved context")
-    question = dspy.InputField(desc="User's question")
-    answer = dspy.OutputField(desc="Answer based on context")
 
-class MultimodalRAG(dspy.Module):
+# Clear cache and reinstall    context = dspy.InputField(desc="Retrieved context")
+
+cd frontend    question = dspy.InputField(desc="User's question")
+
+rm -rf node_modules package-lock.json    answer = dspy.OutputField(desc="Answer based on context")
+
+npm install
+
+```class MultimodalRAG(dspy.Module):
+
     def __init__(self, vector_db, llm):
-        self.retrieve = dspy.Retrieve(k=5)
-        self.generate_answer = dspy.ChainOfThought(RAGSignature)
-```
+
+### Model loading fails        self.retrieve = dspy.Retrieve(k=5)
+
+```bash        self.generate_answer = dspy.ChainOfThought(RAGSignature)
+
+# Check Hugging Face cache```
+
+ls ~/.cache/huggingface/hub/
 
 #### **Pipeline Flow**:
-1. **Retrieval**: Search vector DB for relevant chunks
-2. **Context Formatting**: Combine retrieved documents
+
+# Clear cache and re-download1. **Retrieval**: Search vector DB for relevant chunks
+
+rm -rf ~/.cache/huggingface/hub/models--LGAI-EXAONE*2. **Context Formatting**: Combine retrieved documents
+
 3. **Chain-of-Thought**: DSPy generates structured reasoning
-4. **Answer Generation**: LLM produces final answer
-5. **Source Attribution**: Returns relevant metadata
 
-### 5. Model Integration (`dnotitia_model.py`)
+# Verify internet connection for first download4. **Answer Generation**: LLM produces final answer
 
-Wrapper for **multiple language models** with automatic fallback:
+```5. **Source Attribution**: Returns relevant metadata
 
-**Primary Model**: dnotitia/DNA-2.0-1.7B (1.7B params, requires approval)  
-**Fallback Model**: upstage/SOLAR-10.7B-v1.0 (10.7B params, open access)
 
-**Features**:
+
+### CORS errors### 5. Model Integration (`dnotitia_model.py`)
+
+```bash
+
+# Verify proxy in vite.config.jsWrapper for **multiple language models** with automatic fallback:
+
+# Verify CORS middleware in backend/main.py
+
+# Check both servers are running on correct ports**Primary Model**: dnotitia/DNA-2.0-1.7B (1.7B params, requires approval)  
+
+```**Fallback Model**: upstage/SOLAR-10.7B-v1.0 (10.7B params, open access)
+
+
+
+## 📝 License**Features**:
+
 - **Auto Device Selection**: GPU (CUDA/MPS) or CPU
-- **Automatic Fallback**: Uses SOLAR if primary model unavailable
+
+MIT- **Automatic Fallback**: Uses SOLAR if primary model unavailable
+
 - **Half-Precision**: FP16 on GPU for efficiency
-- **Configurable Sampling**: Temperature, top_p, max_tokens
+
+## 🤝 Contributing- **Configurable Sampling**: Temperature, top_p, max_tokens
+
 - **Batch Generation**: Process multiple prompts
-- **Token Management**: Handles padding, EOS tokens
-- **Smart Error Handling**: Detects auth errors and switches models
 
-**Model Parameters**:
-- Max sequence length: 2048 tokens
+Contributions welcome! Please:- **Token Management**: Handles padding, EOS tokens
+
+1. Fork the repository- **Smart Error Handling**: Detects auth errors and switches models
+
+2. Create a feature branch
+
+3. Make your changes**Model Parameters**:
+
+4. Submit a pull request- Max sequence length: 2048 tokens
+
 - Temperature: 0.7 (configurable)
-- Top-p: 0.9 (nucleus sampling)
 
-> **Note**: If dnotitia model is pending approval, the app automatically uses SOLAR-10.7B. No manual intervention needed! See [docs/general/MODEL_GUIDE.md](docs/general/MODEL_GUIDE.md) for details.
+## 📧 Support- Top-p: 0.9 (nucleus sampling)
 
-### 6. Streamlit UI (`ui/app.py`, `ui/components.py`)
+
+
+For issues or questions:> **Note**: If dnotitia model is pending approval, the app automatically uses SOLAR-10.7B. No manual intervention needed! See [docs/general/MODEL_GUIDE.md](docs/general/MODEL_GUIDE.md) for details.
+
+- Create an issue on GitHub
+
+- Check existing documentation### 6. Streamlit UI (`ui/app.py`, `ui/components.py`)
+
+- Review API docs at http://localhost:8000/docs
 
 **Three Main Pages**:
 
+---
+
 #### **💬 Chat Page**
-- Real-time conversation interface
+
+**Note:** All existing business logic (chatbot, RAG, vector DB, ingestion) from the original Streamlit version has been preserved and wrapped with API endpoints. No changes to core functionality.- Real-time conversation interface
+
 - Message history display
 - Streaming responses
 - Source attribution
